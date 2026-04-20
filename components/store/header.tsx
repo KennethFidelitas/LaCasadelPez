@@ -10,7 +10,7 @@ const navigation = [
   { name: 'Inicio', href: '/' },
   { name: 'Tienda', href: '/tienda' },
   { name: 'Peces', href: '/peces' },
-  { name: 'Acuarios a Medida', href: '/configurador' },
+  { name: 'Acuarios a Medida', href: '/armaTuPecera' },
   { name: 'Nosotros', href: '/nosotros' },
 ]
 

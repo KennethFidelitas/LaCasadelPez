@@ -56,7 +56,7 @@ export default async function HomePage() {
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
-                  <Link href="/configurador">
+                  <Link href="/armaTuPecera">
                     Crear Acuario a Medida
                   </Link>
                 </Button>
