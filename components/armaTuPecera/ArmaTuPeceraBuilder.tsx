@@ -368,7 +368,7 @@ function PeceraCard({
       </span>
       <div className="mb-0.5 text-sm font-medium text-foreground">{pecera.name}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">{pecera.dimensions}</div>
-      <div className="mt-2 font-mono text-sm font-medium text-foreground">
+      <div className="mt-2 font-mono text-sm font-medium text-primary">
         {formatColones(pecera.price)}
       </div>
     </button>
@@ -422,7 +422,7 @@ function FiltroCard({
       <div className="mt-0.5 text-xs text-muted-foreground">
         {filtro.tipo} · {rangeLabel}
       </div>
-      <div className="mt-2 font-mono text-sm font-medium text-foreground">
+      <div className="mt-2 font-mono text-sm font-medium text-primary">
         {formatColones(filtro.price)}
       </div>
     </div>
@@ -486,7 +486,7 @@ function FishCard({
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-mono text-xs text-foreground/70">
+          <div className="font-mono text-xs text-primary">
             {formatColones(fish.price)}
           </div>
           <div className="text-xs text-muted-foreground">c/u</div>

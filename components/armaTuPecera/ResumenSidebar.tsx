@@ -117,7 +117,7 @@ export function ResumenSidebar({
             <div className="mt-4 border-t border-border pt-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">Total</span>
-                <span className="font-mono text-base font-medium text-foreground">
+                <span className="font-mono text-base font-medium text-primary">
                   {formatColones(total)}
                 </span>
               </div>
