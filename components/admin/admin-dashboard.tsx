@@ -725,19 +725,6 @@ export function AdminDashboard() {
                     <SettingRow title="Permisos" detail="Administrador, caja, inventario y produccion." />
                   </CardContent>
                 </Card>
-
-                <Card className="rounded-lg">
-                  <CardHeader>
-                    <CardTitle>Roadmap frontend</CardTitle>
-                    <CardDescription>Subpantallas que seguirian despues de este dashboard.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <SettingRow title="/dashboard/ventas" detail="POS completo con cierre de caja y apartados." />
-                    <SettingRow title="/dashboard/inventario" detail="CRUD y movimientos por bodega." />
-                    <SettingRow title="/dashboard/pedidos" detail="Seguimiento y linea de tiempo." />
-                    <SettingRow title="/dashboard/clientes" detail="Perfil, creditos y recompra." />
-                  </CardContent>
-                </Card>
               </section>
             )}
           </div>
