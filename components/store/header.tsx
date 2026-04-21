@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Tienda', href: '/tienda' },
   { name: 'Peces', href: '/peces' },
   { name: 'Acuarios a Medida', href: '/armaTuPecera' },
+  { name: 'Administracion', href: '/dashboard' },
   { name: 'Nosotros', href: '/nosotros' },
 ]
 
