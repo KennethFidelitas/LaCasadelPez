@@ -76,7 +76,7 @@ export default function PecesPage() {
         </p>
       </div>
 
-      {/* Botón de filtros — solo visible en mobile */}
+      {/* Botón de filtros — solo visible para los móviles */}
       <div className="mb-4 lg:hidden">
         <button
           onClick={() => setSidebarOpen(true)}
