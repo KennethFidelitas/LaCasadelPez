@@ -124,7 +124,7 @@ export function ArmaTuPeceraBuilder() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-medium text-foreground">Arma tu Pecera</h1>
+        <h1 className="text-2xl font-bold text-foreground">Arma tu Pecera</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Configura tu acuario paso a paso — cada elección desbloquea el siguiente paso.
         </p>
