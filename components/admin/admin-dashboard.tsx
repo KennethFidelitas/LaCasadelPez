@@ -599,34 +599,37 @@ export function AdminDashboard() {
             )}
 
             {activeModule === 'production' && (
-              <section className="grid gap-6 xl:grid-cols-4">
-                {(['Cotizacion', 'Corte', 'Pegado', 'Acabados'] as const).map((stage) => (
-                  <Card key={stage} className="rounded-lg">
-                    <CardHeader>
-                      <CardTitle>{stage}</CardTitle>
-                      <CardDescription>
-                        {productionQueue.filter((item) => item.stage === stage).length} trabajos en esta fase.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-3">
-                      {productionQueue
-                        .filter((item) => item.stage === stage)
-                        .map((item) => (
-                          <div key={item.id} className="rounded-lg border p-3">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium">{item.id}</p>
-                              <Badge variant="outline">{item.progress}%</Badge>
-                            </div>
-                            <p className="mt-2 text-sm text-foreground">{item.model}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{item.client}</p>
-                            <div className="mt-3">
-                              <Progress value={item.progress} />
-                            </div>
-                          </div>
-                        ))}
-                    </CardContent>
-                  </Card>
-                ))}
+              <section className="grid gap-6">
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Órdenes de producción</CardTitle>
+                    <CardDescription>
+                      Gestión completa de peceras personalizadas: cotizaciones, fabricación y entregas.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">En producción</p>
+                        <p className="mt-2 text-2xl font-semibold">—</p>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">Listas para entrega</p>
+                        <p className="mt-2 text-2xl font-semibold">—</p>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">Cotizaciones abiertas</p>
+                        <p className="mt-2 text-2xl font-semibold">—</p>
+                      </div>
+                    </div>
+                    <Button asChild className="w-full sm:w-auto">
+                      <Link href="/dashboard/ordenes-produccion">
+                        <Factory className="h-4 w-4" />
+                        Ver todas las órdenes de producción
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
               </section>
             )}
 

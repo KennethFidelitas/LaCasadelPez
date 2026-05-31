@@ -72,7 +72,8 @@ export interface Profile {
   first_name: string | null
   last_name: string | null
   phone: string | null
-  role: 'customer' | 'admin' | 'staff'
+  // La BD usa 'employee' para el rol de vendedor (no 'staff')
+  role: 'customer' | 'admin' | 'employee'
   store_credit_balance: number
   total_purchases: number
   created_at: string
@@ -160,24 +161,50 @@ export interface StoreCredit {
 
 export interface ProductionOrder {
   id: string
-  order_number: string
-  customer_id: string | null
-  quote_id: string | null
-  status: 'cotizado' | 'aprobado' | 'en_produccion' | 'en_acabado' | 'listo' | 'entregado' | 'cancelado'
-  priority: 'baja' | 'normal' | 'alta' | 'urgente'
-  title: string
-  description: string | null
-  specifications: Record<string, unknown> | null
-  estimated_cost: number | null
-  final_cost: number | null
-  deposit_amount: number | null
-  deposit_paid: boolean
-  estimated_completion: string | null
-  actual_completion: string | null
-  assigned_to: string | null
+  order_number: string  // auto-generado por trigger (formato PYY00000), no asignar al crear
+  user_id: string | null
+  status: 'cotizado' | 'confirmado' | 'en_produccion' | 'listo' | 'entregado' | 'cancelado'
+  payment_status: 'pendiente' | 'anticipo' | 'pagado' | 'reembolsado'
+  config: Record<string, unknown>
+  accessories: Record<string, unknown>[]
+  // Dimensiones en cm
+  width: number | null
+  height: number | null
+  depth: number | null
+  glass_type: string | null
+  glass_thickness: number | null  // mm
+  // Desglose de precios
+  materials_cost: number
+  labor_cost: number
+  accessories_cost: number
+  subtotal: number
+  discount: number
+  total: number
+  deposit_paid: number
+  // Tiempos
+  estimated_days: number | null
+  started_at: string | null
+  completed_at: string | null
+  delivered_at: string | null
+  // Contacto del cliente
+  customer_name: string | null
+  customer_email: string | null
+  customer_phone: string | null
+  // Notas
   notes: string | null
+  internal_notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ProductionUpdate {
+  id: string
+  production_order_id: string
+  status: string | null
+  message: string
+  images: string[]
+  created_by: string | null
+  created_at: string
 }
 
 export interface CustomAquariumQuote {
@@ -227,3 +254,5 @@ export type PaymentStatus = Order['payment_status']
 export type CareLevel = Animal['care_level']
 export type WaterType = Animal['water_type']
 export type UserRole = Profile['role']
+export type ProductionStatus = ProductionOrder['status']
+export type ProductionPaymentStatus = ProductionOrder['payment_status']
