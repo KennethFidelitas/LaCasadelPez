@@ -29,6 +29,14 @@ import { Progress } from '@/components/ui/display/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import { Input } from '@/components/ui/forms/input'
 import { formatPrice } from '@/lib/format'
+import { OrderStatusChanger } from '@/components/admin/OrderStatusChanger'
+import { RegisterPaymentDialog } from '@/components/admin/RegisterPaymentDialog'
+import { SaveProductionOrderForm } from '@/components/admin/SaveProductionOrderForm'
+import {
+  type ProductionOrder,
+  STATUS_LABELS,
+  getStatusVariant,
+} from '@/lib/production-orders'
 
 type ModuleKey =
   | 'overview'
@@ -160,6 +168,8 @@ export function AdminDashboard() {
   const [inventoryItems, setInventoryItems] = useState(initialInventory)
   const [inventorySearch, setInventorySearch] = useState('')
   const [orders, setOrders] = useState(initialOrders)
+  const [activeProductionTab, setActiveProductionTab] = useState<'tablero' | 'nueva'>('tablero')
+  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([])
 
   const subtotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -599,34 +609,178 @@ export function AdminDashboard() {
             )}
 
             {activeModule === 'production' && (
-              <section className="grid gap-6 xl:grid-cols-4">
-                {(['Cotizacion', 'Corte', 'Pegado', 'Acabados'] as const).map((stage) => (
-                  <Card key={stage} className="rounded-lg">
-                    <CardHeader>
-                      <CardTitle>{stage}</CardTitle>
-                      <CardDescription>
-                        {productionQueue.filter((item) => item.stage === stage).length} trabajos en esta fase.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-3">
-                      {productionQueue
-                        .filter((item) => item.stage === stage)
-                        .map((item) => (
-                          <div key={item.id} className="rounded-lg border p-3">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium">{item.id}</p>
-                              <Badge variant="outline">{item.progress}%</Badge>
-                            </div>
-                            <p className="mt-2 text-sm text-foreground">{item.model}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{item.client}</p>
-                            <div className="mt-3">
-                              <Progress value={item.progress} />
-                            </div>
-                          </div>
-                        ))}
-                    </CardContent>
-                  </Card>
-                ))}
+              <section className="grid gap-6">
+                {/* Tabs: Tablero / Nueva orden */}
+                <div className="flex gap-2 border-b pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveProductionTab('tablero')}
+                    className={[
+                      'px-4 py-2 text-sm font-medium transition-colors',
+                      activeProductionTab === 'tablero'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    Tablero de órdenes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveProductionTab('nueva')}
+                    className={[
+                      'px-4 py-2 text-sm font-medium transition-colors',
+                      activeProductionTab === 'nueva'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    + Nueva orden (RF-OP-009)
+                  </button>
+                </div>
+
+                {/* Tab: Tablero */}
+                {activeProductionTab === 'tablero' && (
+                  <>
+                    {/* Tablero Kanban — datos de demostración + órdenes creadas */}
+                    <section className="grid gap-6 xl:grid-cols-4">
+                      {(['Cotizacion', 'Corte', 'Pegado', 'Acabados'] as const).map((stage) => (
+                        <Card key={stage} className="rounded-lg">
+                          <CardHeader>
+                            <CardTitle>{stage}</CardTitle>
+                            <CardDescription>
+                              {productionQueue.filter((item) => item.stage === stage).length} trabajos en esta fase.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="grid gap-3">
+                            {productionQueue
+                              .filter((item) => item.stage === stage)
+                              .map((item) => (
+                                <div key={item.id} className="rounded-lg border p-3">
+                                  <div className="flex items-center justify-between">
+                                    <p className="font-medium">{item.id}</p>
+                                    <Badge variant="outline">{item.progress}%</Badge>
+                                  </div>
+                                  <p className="mt-2 text-sm text-foreground">{item.model}</p>
+                                  <p className="mt-1 text-sm text-muted-foreground">{item.client}</p>
+                                  <div className="mt-3">
+                                    <Progress value={item.progress} />
+                                  </div>
+                                </div>
+                              ))}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </section>
+
+                    {/* Tabla de órdenes reales guardadas en Supabase */}
+                    {productionOrders.length > 0 && (
+                      <Card className="rounded-lg">
+                        <CardHeader>
+                          <CardTitle>Órdenes guardadas</CardTitle>
+                          <CardDescription>
+                            Órdenes de producción en el sistema. Cambia estado (RF-OP-006) y registra pagos (RF-OP-007 / RF-OP-008).
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Orden</TableHead>
+                                <TableHead>Cliente</TableHead>
+                                <TableHead>Total</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead>Pago</TableHead>
+                                <TableHead>Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {productionOrders.map((order) => (
+                                <TableRow key={order.id}>
+                                  <TableCell className="font-medium">
+                                    #{order.order_number}
+                                  </TableCell>
+                                  <TableCell>{order.customer_name ?? '—'}</TableCell>
+                                  <TableCell>{formatPrice(order.total)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={getStatusVariant(order.status)}>
+                                      {STATUS_LABELS[order.status]}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        order.payment_status === 'pagado'
+                                          ? 'secondary'
+                                          : order.payment_status === 'anticipo'
+                                            ? 'default'
+                                            : 'outline'
+                                      }
+                                    >
+                                      {order.payment_status === 'pagado'
+                                        ? 'Pagado'
+                                        : order.payment_status === 'anticipo'
+                                          ? 'Anticipo'
+                                          : 'Pendiente'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      {/* RF-OP-006 */}
+                                      <OrderStatusChanger
+                                        order={order}
+                                        adminUserId="demo-admin"
+                                        onStatusChanged={(updated) =>
+                                          setProductionOrders((prev) =>
+                                            prev.map((o) => (o.id === updated.id ? updated : o)),
+                                          )
+                                        }
+                                      />
+                                      {/* RF-OP-007 / RF-OP-008 */}
+                                      <RegisterPaymentDialog
+                                        order={order}
+                                        onPaymentRegistered={(updated) =>
+                                          setProductionOrders((prev) =>
+                                            prev.map((o) => (o.id === updated.id ? updated : o)),
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {productionOrders.length === 0 && (
+                      <Card className="rounded-lg">
+                        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                          No hay órdenes de producción guardadas aún.{' '}
+                          <button
+                            type="button"
+                            className="text-primary underline"
+                            onClick={() => setActiveProductionTab('nueva')}
+                          >
+                            Crear una nueva orden
+                          </button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
+
+                {/* Tab: Nueva orden — RF-OP-009 */}
+                {activeProductionTab === 'nueva' && (
+                  <SaveProductionOrderForm
+                    sellerId="demo-seller"
+                    onOrderCreated={(orderNumber) => {
+                      // Volver al tablero al guardar exitosamente
+                      setTimeout(() => setActiveProductionTab('tablero'), 1800)
+                    }}
+                  />
+                )}
               </section>
             )}
 
