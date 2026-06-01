@@ -275,7 +275,7 @@ export function AdminDashboard() {
               <div className="flex flex-wrap gap-3">
                 <Button variant="outline" asChild>
                   <Link href="/tienda">Ver tienda</Link>
-                </Button>
+                </Button>              
                 <Button asChild>
                   <Link href="/auth/login">Acceso demo</Link>
                 </Button>
@@ -469,8 +469,29 @@ export function AdminDashboard() {
               <section className="grid gap-6">
                 <Card className="rounded-lg">
                   <CardHeader>
-                    <CardTitle>Control de inventario</CardTitle>
-                    <CardDescription>Busqueda, alertas y ajustes rapidos de stock.</CardDescription>
+                    <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>Control de inventario</CardTitle>
+                      <CardDescription>Busqueda, alertas y ajustes rapidos de stock.</CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/agregar-animal">
+                          Agregar Nuevo Animal
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/modificar-lote">
+                          Modificar Lote
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/consultar-animales">
+                          Consultar Inventario
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>                  
                   </CardHeader>
                   <CardContent>
                     <div className="mb-4 flex items-center gap-3">
@@ -672,7 +693,13 @@ export function AdminDashboard() {
                   </CardHeader>
                   <CardContent className="grid gap-3">
                     <ActionRow icon={Users} title="Crear ficha de cliente" detail="Registro rapido desde tienda o POS." />
-                    <ActionRow icon={Wallet} title="Aplicar credito" detail="Usar saldo a favor o nota interna." />
+                    <Link href="/credito">
+                      <ActionRow
+                        icon={Wallet}
+                        title="Consultar credito"
+                        detail="Buscar cliente y revisar saldo pendiente."
+                      />
+                    </Link>
                     <ActionRow icon={Store} title="Registrar apartado" detail="Separar producto con anticipo." />
                     <ActionRow icon={Activity} title="Seguimiento" detail="Clientes con cotizacion o recompra." />
                   </CardContent>
