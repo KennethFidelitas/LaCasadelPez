@@ -2,6 +2,7 @@ import { CartProvider } from '@/lib/cart-context'
 import { StoreHeader } from '@/components/store/header'
 import { StoreFooter } from '@/components/store/footer'
 import { CartDrawer } from '@/components/store/cart-drawer'
+import { Toaster } from '@/components/ui/feedback/sonner'
 
 export default function StoreLayout({
   children,
@@ -15,6 +16,7 @@ export default function StoreLayout({
         <main className="flex-1">{children}</main>
         <StoreFooter />
         <CartDrawer />
+        <Toaster richColors position="bottom-right" />
       </div>
     </CartProvider>
   )

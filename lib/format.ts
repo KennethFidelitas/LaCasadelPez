@@ -1,10 +1,10 @@
 /**
- * Format a price in Mexican Pesos
+ * Format a price in Costa Rican Colones
  */
 export function formatPrice(price: number): string {
-  return new Intl.NumberFormat('es-MX', {
+  return new Intl.NumberFormat('es-CR', {
     style: 'currency',
-    currency: 'MXN',
+    currency: 'CRC',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(price)

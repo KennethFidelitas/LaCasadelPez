@@ -18,11 +18,17 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
   const supabase = await createClient()
 
   // Fetch categories for filters
-  const { data: categories } = await supabase
+  const { data: categories, error: categoriesError } = await supabase
     .from('categories')
     .select('*')
     .eq('is_active', true)
     .order('display_order', { ascending: true })
+
+  if (categoriesError) {
+    console.error('[TiendaPage] categories error:', categoriesError)
+  } else {
+    console.log('[TiendaPage] categories loaded:', categories?.length ?? 0)
+  }
 
   // Build product query
   let query = supabase
@@ -66,7 +72,13 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
 
   query = query.range(from, to)
 
-  const { data: products, count } = await query
+  const { data: products, count, error: productsError } = await query
+
+  if (productsError) {
+    console.error('[TiendaPage] products error:', productsError)
+  } else {
+    console.log('[TiendaPage] products loaded:', products?.length ?? 0, 'count:', count ?? 0)
+  }
 
   const totalPages = Math.ceil((count || 0) / limit)
 
