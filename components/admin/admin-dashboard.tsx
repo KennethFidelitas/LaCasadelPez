@@ -12,7 +12,6 @@ import {
   FileText,
   LayoutDashboard,
   Minus,
-  Package,
   Plus,
   Receipt,
   Search,
@@ -22,6 +21,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import { CreditManagement } from '@/components/admin/credit-management'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -37,6 +37,7 @@ type ModuleKey =
   | 'orders'
   | 'production'
   | 'customers'
+  | 'credits'
   | 'reports'
   | 'settings'
 
@@ -96,6 +97,7 @@ const modules = [
   { key: 'orders', label: 'Pedidos', icon: ShoppingCart },
   { key: 'production', label: 'Produccion', icon: Factory },
   { key: 'customers', label: 'Clientes', icon: Users },
+  { key: 'credits', label: 'Creditos', icon: Wallet },
   { key: 'reports', label: 'Reportes', icon: FileText },
   { key: 'settings', label: 'Configuracion', icon: Settings2 },
 ] as const satisfies ReadonlyArray<{
@@ -710,6 +712,10 @@ export function AdminDashboard() {
               </section>
             )}
 
+            {activeModule === 'credits' && (
+              <CreditManagement />
+            )}
+
             {activeModule === 'reports' && (
               <section className="grid gap-6">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -772,6 +778,7 @@ function getModuleTitle(module: ModuleKey) {
     orders: 'Pedidos y operacion e-commerce',
     production: 'Produccion de peceras',
     customers: 'Clientes y creditos',
+    credits: 'Gestion crediticia',
     reports: 'Reportes y control',
     settings: 'Configuracion del sistema',
   }
@@ -787,6 +794,7 @@ function getModuleDescription(module: ModuleKey) {
     orders: 'Seguimiento de pedidos por canal, estados y cumplimiento.',
     production: 'Tablero de fabricacion y avances de proyectos personalizados.',
     customers: 'Panel para perfiles, segmentacion, saldos y seguimiento.',
+    credits: 'Registro, edicion, eliminacion y consulta de creditos para clientes.',
     reports: 'KPIs y tendencias para decidir rapido.',
     settings: 'Parametros necesarios para convertir esta demo en sistema real.',
   }
