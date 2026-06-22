@@ -30,7 +30,7 @@ async function registrarAnimal(formData: FormData) {
   const slug = `${nombre}-${Date.now()}`
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
 
@@ -58,7 +58,7 @@ async function registrarAnimal(formData: FormData) {
     max_size: tamanioMaximo,
     origin: origen || null,
     lifespan: esperanzaVida || null,
-    compatibility: compatibilidad 
+    compatibility: compatibilidad
       ? compatibilidad.split(",").map((item: string) => item.trim())
       : null,
     images: imagenes ? imagenes.split(",").map((img: string) => img.trim()) : null,
@@ -117,7 +117,7 @@ export default function AgregarAnimalPage() {
             {/* Información básica */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Información básica</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
@@ -205,7 +205,7 @@ export default function AgregarAnimalPage() {
             {/* Características del animal */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Características</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
@@ -287,7 +287,7 @@ export default function AgregarAnimalPage() {
             {/* Parámetros del acuario */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Parámetros del acuario</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
@@ -383,7 +383,7 @@ export default function AgregarAnimalPage() {
             {/* Inventario y logística */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Inventario y logística</h3>
-              
+
               <div className="grid gap-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
