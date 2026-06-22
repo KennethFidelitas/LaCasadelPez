@@ -49,6 +49,15 @@ type PosProduct = {
   category: string
 }
 
+type EmailTemplate = {
+  id: string
+  name: string
+  trigger: string
+  subject: string
+  body: string
+  active: boolean
+}
+
 type CartItem = PosProduct & {
   quantity: number
 }
@@ -148,6 +157,25 @@ const reportCards = [
   { title: 'Pedidos entregados', value: '34 / 41', progress: 83 },
 ]
 
+const initialEmailTemplates: EmailTemplate[] = [
+  {
+    id: 'email-1',
+    name: 'Confirmación de compra',
+    trigger: 'venta_confirmada',
+    subject: 'Gracias por tu compra en La Casa del Pez',
+    body: 'Hola {{cliente}}, gracias por tu compra. Tu factura {{factura}} por {{total}} ha sido registrada correctamente.',
+    active: true,
+  },
+  {
+    id: 'email-2',
+    name: 'Pedido listo',
+    trigger: 'pedido_listo',
+    subject: 'Tu pedido está listo para retirar',
+    body: 'Hola {{cliente}}, tu pedido {{pedido}} ya está listo para retirar en nuestra tienda.',
+    active: true,
+  },
+]
+
 export function AdminDashboard() {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
   const [cartItems, setCartItems] = useState<CartItem[]>([
@@ -155,11 +183,33 @@ export function AdminDashboard() {
     { ...posCatalog[4], quantity: 3 },
   ])
   const [discount, setDiscount] = useState(0)
-  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Mixto'>('Efectivo')
+  const [paymentMethod, setPaymentMethod] = useState<
+  'efectivo' | 'tarjeta' | 'credito' | 'mixto'
+>('efectivo')
+  const [cashReceived, setCashReceived] = useState(0)
+  const [cardAmount, setCardAmount] = useState(0)
+  const [creditAmount, setCreditAmount] = useState(0)
   const [cashSessionOpen, setCashSessionOpen] = useState(true)
+  const [openingCash, setOpeningCash] = useState(120000)
+  const [closingCash, setClosingCash] = useState(0)
+  const [cashNotes, setCashNotes] = useState("")
   const [inventoryItems, setInventoryItems] = useState(initialInventory)
   const [inventorySearch, setInventorySearch] = useState('')
   const [orders, setOrders] = useState(initialOrders)
+  const [emailTemplates, setEmailTemplates] = useState(initialEmailTemplates)
+  const [selectedTemplateId, setSelectedTemplateId] = useState(initialEmailTemplates[0].id)
+
+  const [newTemplateName, setNewTemplateName] = useState('')
+  const [newTemplateTrigger, setNewTemplateTrigger] = useState('venta_confirmada')
+  const [newTemplateSubject, setNewTemplateSubject] = useState('')
+  const [newTemplateBody, setNewTemplateBody] = useState('')
+
+  const [testEmail, setTestEmail] = useState('')
+  const [emailPreview, setEmailPreview] = useState('')
+
+  const selectedTemplate = emailTemplates.find(
+    (template) => template.id === selectedTemplateId,
+  )
 
   const subtotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -167,6 +217,39 @@ export function AdminDashboard() {
   )
   const total = subtotal - discount
 
+  const cashSalesAmount =
+    paymentMethod === 'efectivo'
+      ? total
+      : paymentMethod === 'mixto'
+        ? cashReceived
+        : 0
+
+  const expectedCash = openingCash + cashSalesAmount
+
+  const cashDifference = closingCash > 0 ? closingCash - expectedCash : 0
+
+  const cashChange =
+    paymentMethod === 'efectivo' || paymentMethod === 'mixto'
+      ? Math.max(0, cashReceived - total)
+      : 0
+
+  const getPaymentMethodLabel = (method: string) => {
+    if (method === 'efectivo') return 'Efectivo'
+    if (method === 'tarjeta') return 'Tarjeta'
+    if (method === 'credito') return 'Crédito'
+    if (method === 'mixto') return 'Mixto'
+    return method
+  }  
+
+  const handleOpenCashSession = () => {
+    setCashSessionOpen(true)
+    setClosingCash(0)
+    setCashNotes("")
+  }
+
+  const handleCloseCashSession = () => {
+    setCashSessionOpen(false)
+  }  
   const filteredInventory = useMemo(() => {
     const term = inventorySearch.toLowerCase()
     return inventoryItems.filter(
@@ -218,6 +301,98 @@ export function AdminDashboard() {
     )
   }
 
+function updateEmailTemplate(
+  field: keyof EmailTemplate,
+  value: string | boolean,
+) {
+  setEmailTemplates((current) =>
+    current.map((template) =>
+      template.id === selectedTemplateId
+        ? {
+            ...template,
+            [field]: value,
+          }
+        : template,
+    ),
+  )
+}
+
+function createEmailTemplate() {
+  if (!newTemplateName.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
+    alert('Complete nombre, asunto y mensaje de la plantilla.')
+    return
+  }
+
+  const newTemplate: EmailTemplate = {
+    id: `email-${Date.now()}`,
+    name: newTemplateName,
+    trigger: newTemplateTrigger,
+    subject: newTemplateSubject,
+    body: newTemplateBody,
+    active: true,
+  }
+
+  setEmailTemplates((current) => [...current, newTemplate])
+  setSelectedTemplateId(newTemplate.id)
+
+  setNewTemplateName('')
+  setNewTemplateTrigger('venta_confirmada')
+  setNewTemplateSubject('')
+  setNewTemplateBody('')
+}
+
+function renderTemplate(templateText: string) {
+  return templateText
+    .replaceAll('{{cliente}}', 'María Rodríguez')
+    .replaceAll('{{factura}}', 'FAC-0002')
+    .replaceAll('{{total}}', formatPrice(40000))
+    .replaceAll('{{pedido}}', 'ORD-1042')
+    .replaceAll('{{saldo}}', formatPrice(85000))
+}
+
+function previewSelectedTemplate() {
+  if (!selectedTemplate) return
+
+  const preview = `
+Asunto: ${renderTemplate(selectedTemplate.subject)}
+
+${renderTemplate(selectedTemplate.body)}
+  `.trim()
+
+  setEmailPreview(preview)
+}
+
+async function sendTestEmail() {
+  if (!selectedTemplate) return
+
+  if (!testEmail.trim()) {
+    alert('Digite un correo de prueba.')
+    return
+  }
+
+  const subject = renderTemplate(selectedTemplate.subject)
+  const body = renderTemplate(selectedTemplate.body)
+
+  const response = await fetch('/api/send-email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      to: testEmail,
+      subject,
+      body,
+    }),
+  })
+
+  if (!response.ok) {
+    alert('No se pudo enviar el correo.')
+    return
+  }
+
+  alert('Correo enviado correctamente.')
+}
+  
   return (
     <div className="min-h-screen bg-[#f4f7fb]">
       <div className="mx-auto flex max-w-[1600px] flex-col md:min-h-screen md:flex-row">
@@ -278,7 +453,7 @@ export function AdminDashboard() {
                 </Button>              
                 <Button asChild>
                   <Link href="/auth/login">Acceso demo</Link>
-                </Button>
+                </Button>              
               </div>
             </div>
           </section>
@@ -382,21 +557,44 @@ export function AdminDashboard() {
                   <CardContent className="grid gap-5">
                     <div className="grid gap-3">
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant={cashSessionOpen ? 'destructive' : 'default'}
-                          size="sm"
-                          onClick={() => setCashSessionOpen((current) => !current)}
-                        >
-                          {cashSessionOpen ? 'Cerrar caja' : 'Abrir caja'}
-                        </Button>
-                        {(['Efectivo', 'Tarjeta', 'Mixto'] as const).map((method) => (
+                      <Button variant="outline" asChild>
+                        <Link href="/ventas/imprimir-venta">
+                          Imprimir Factura
+                      </Link>
+                      </Button>
+                      <Button
+                        variant={cashSessionOpen ? 'destructive' : 'default'}
+                        size="sm"
+                        onClick={() => {
+                          if (cashSessionOpen) {
+                            handleCloseCashSession()
+                          } else {
+                            handleOpenCashSession()
+                          }
+                        }}
+                      >
+                        {cashSessionOpen ? 'Cerrar caja' : 'Abrir caja'}
+                      </Button>
+                        {[
+                          { value: 'efectivo', label: 'Efectivo' },
+                          { value: 'tarjeta', label: 'Tarjeta' },
+                          { value: 'credito', label: 'Crédito' },
+                          { value: 'mixto', label: 'Mixto' },
+                        ].map((method) => (
                           <Button
-                            key={method}
-                            variant={paymentMethod === method ? 'default' : 'outline'}
+                            key={method.value}
+                            variant={paymentMethod === method.value ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setPaymentMethod(method)}
+                            onClick={() => {
+                              setPaymentMethod(
+                                method.value as 'efectivo' | 'tarjeta' | 'credito' | 'mixto'
+                              )
+                              setCashReceived(0)
+                              setCardAmount(0)
+                              setCreditAmount(0)
+                            }}
                           >
-                            {method}
+                            {method.label}
                           </Button>
                         ))}
                       </div>
@@ -447,19 +645,185 @@ export function AdminDashboard() {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-lg border p-4">
-                        <p className="text-sm text-muted-foreground">Metodo de pago</p>
-                        <p className="mt-1 font-semibold">{paymentMethod}</p>
+                        <p className="text-sm text-muted-foreground">Método de pago</p>
+                        <p className="mt-1 font-semibold">
+                          {getPaymentMethodLabel(paymentMethod)}
+                        </p>
                       </div>
+
                       <div className="rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">Apartado</p>
                         <p className="mt-1 font-semibold">Disponible para anticipo</p>
                       </div>
                     </div>
 
-                    <Button className="w-full">
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium text-foreground">Detalle del pago</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Registra el monto según la forma de pago seleccionada.
+                      </p>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {(paymentMethod === 'efectivo' || paymentMethod === 'mixto') && (
+                          <>
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                Efectivo recibido
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={cashReceived}
+                                onChange={(event) => setCashReceived(Number(event.target.value))}
+                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                                placeholder="Ej: 30000"
+                              />
+                            </div>
+
+                            <div>
+                              <p className="text-sm text-muted-foreground">Cambio</p>
+                              <p className="mt-2 font-semibold">
+                                {formatPrice(cashChange)}
+                              </p>
+                            </div>
+                          </>
+                        )}
+
+                        {(paymentMethod === 'tarjeta' || paymentMethod === 'mixto') && (
+                          <div>
+                            <label className="text-sm text-muted-foreground">
+                              Monto tarjeta
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={cardAmount}
+                              onChange={(event) => setCardAmount(Number(event.target.value))}
+                              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                              placeholder="Ej: 24000"
+                            />
+                          </div>
+                        )}
+
+                        {paymentMethod === 'credito' && (
+                          <div>
+                            <label className="text-sm text-muted-foreground">
+                              Monto crédito
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={creditAmount}
+                              onChange={(event) => setCreditAmount(Number(event.target.value))}
+                              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                              placeholder="Ej: 25000"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+<div className="rounded-lg border p-4">
+  <div className="flex items-center justify-between gap-3">
+    <div>
+      <p className="font-medium text-foreground">Gestión de caja</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Controla apertura, efectivo esperado y cierre de caja.
+      </p>
+    </div>
+
+    <Badge variant={cashSessionOpen ? 'secondary' : 'outline'}>
+      {cashSessionOpen ? 'Caja abierta' : 'Caja cerrada'}
+    </Badge>
+  </div>
+
+  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <div>
+      <label className="text-sm text-muted-foreground">
+        Monto inicial
+      </label>
+      <input
+        type="number"
+        min="0"
+        value={openingCash}
+        disabled={cashSessionOpen}
+        onChange={(event) => setOpeningCash(Number(event.target.value))}
+        className="mt-1 w-full rounded-md border px-3 py-2 text-sm disabled:bg-muted"
+        placeholder="Ej: 120000"
+      />
+    </div>
+
+    <div>
+      <p className="text-sm text-muted-foreground">Ventas en efectivo</p>
+      <p className="mt-2 font-semibold">
+        {formatPrice(cashSalesAmount)}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-sm text-muted-foreground">Efectivo esperado</p>
+      <p className="mt-2 font-semibold">
+        {formatPrice(expectedCash)}
+      </p>
+    </div>
+
+    <div>
+      <label className="text-sm text-muted-foreground">
+        Efectivo contado al cierre
+      </label>
+      <input
+        type="number"
+        min="0"
+        value={closingCash}
+        onChange={(event) => setClosingCash(Number(event.target.value))}
+        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+        placeholder="Ej: 125000"
+      />
+    </div>
+  </div>
+
+  <div className="mt-4 rounded-md bg-muted p-3">
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">Diferencia de caja</span>
+      <span
+        className={
+          cashDifference === 0
+            ? 'font-semibold text-foreground'
+            : cashDifference > 0
+              ? 'font-semibold text-emerald-600'
+              : 'font-semibold text-red-600'
+        }
+      >
+        {formatPrice(cashDifference)}
+      </span>
+    </div>
+  </div>
+
+  <div className="mt-4">
+    <label className="text-sm text-muted-foreground">
+      Observaciones
+    </label>
+    <textarea
+      value={cashNotes}
+      onChange={(event) => setCashNotes(event.target.value)}
+      className="mt-1 min-h-20 w-full rounded-md border px-3 py-2 text-sm"
+      placeholder="Ej: Diferencia por cambio pendiente, billete dañado, arqueo correcto..."
+    />
+  </div>
+</div>
+
+                    <Button
+                      className="w-full"
+                      disabled={!cashSessionOpen || cartItems.length === 0}
+                    >
                       <CreditCard className="h-4 w-4" />
-                      Confirmar venta demo
+                      Confirmar venta
                     </Button>
+                    {!cashSessionOpen && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        Debes abrir la caja antes de confirmar una venta.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </section>
@@ -743,13 +1107,246 @@ export function AdminDashboard() {
                 <Card className="rounded-lg">
                   <CardHeader>
                     <CardTitle>Configuracion operativa</CardTitle>
-                    <CardDescription>Lo que deberia existir para dejar el sistema listo por sucursal.</CardDescription>
+                    <CardDescription>
+                      Lo que deberia existir para dejar el sistema listo por sucursal.
+                    </CardDescription>
                   </CardHeader>
+
                   <CardContent className="grid gap-3">
-                    <SettingRow title="Formas de pago" detail="Efectivo, tarjeta, SINPE, mixto y credito." />
-                    <SettingRow title="Caja y terminales" detail="Montos iniciales, cierres y responsables." />
-                    <SettingRow title="Impuestos y descuentos" detail="Reglas para venta directa y e-commerce." />
-                    <SettingRow title="Permisos" detail="Administrador, caja, inventario y produccion." />
+                    <SettingRow
+                      title="Formas de pago"
+                      detail="Efectivo, tarjeta, SINPE, mixto y credito."
+                    />
+                    <SettingRow
+                      title="Caja y terminales"
+                      detail="Montos iniciales, cierres y responsables."
+                    />
+                    <SettingRow
+                      title="Impuestos y descuentos"
+                      detail="Reglas para venta directa y e-commerce."
+                    />
+                    <SettingRow
+                      title="Permisos"
+                      detail="Administrador, caja, inventario y produccion."
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Plantillas de email</CardTitle>
+                    <CardDescription>
+                      Crea, edita y prueba comunicaciones automaticas para clientes.
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="grid gap-5">
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium text-foreground">Crear nueva plantilla</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Define una plantilla para automatizar mensajes.
+                      </p>
+
+                      <div className="mt-4 grid gap-3">
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Nombre
+                          </label>
+                          <Input
+                            value={newTemplateName}
+                            onChange={(event) => setNewTemplateName(event.target.value)}
+                            placeholder="Ej: Recordatorio de crédito"
+                            className="mt-1"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Evento
+                          </label>
+                          <select
+                            value={newTemplateTrigger}
+                            onChange={(event) => setNewTemplateTrigger(event.target.value)}
+                            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                          >
+                            <option value="venta_confirmada">Venta confirmada</option>
+                            <option value="pedido_listo">Pedido listo</option>
+                            <option value="credito_pendiente">Crédito pendiente</option>
+                            <option value="apartado_vencido">Apartado vencido</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Asunto
+                          </label>
+                          <Input
+                            value={newTemplateSubject}
+                            onChange={(event) => setNewTemplateSubject(event.target.value)}
+                            placeholder="Ej: Recordatorio de saldo pendiente"
+                            className="mt-1"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Mensaje
+                          </label>
+                          <textarea
+                            value={newTemplateBody}
+                            onChange={(event) => setNewTemplateBody(event.target.value)}
+                            placeholder="Hola {{cliente}}, te recordamos que tenés un saldo pendiente de {{saldo}}."
+                            className="mt-1 min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                          />
+                        </div>
+
+                        <Button onClick={createEmailTemplate}>
+                          Crear plantilla
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium text-foreground">Editar plantilla</p>
+
+                      <div className="mt-4 grid gap-3">
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Seleccionar plantilla
+                          </label>
+
+                          <select
+                            value={selectedTemplateId}
+                            onChange={(event) => setSelectedTemplateId(event.target.value)}
+                            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                          >
+                            {emailTemplates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {template.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {selectedTemplate && (
+                          <>
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                Nombre
+                              </label>
+                              <Input
+                                value={selectedTemplate.name}
+                                onChange={(event) =>
+                                  updateEmailTemplate('name', event.target.value)
+                                }
+                                className="mt-1"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                Asunto
+                              </label>
+                              <Input
+                                value={selectedTemplate.subject}
+                                onChange={(event) =>
+                                  updateEmailTemplate('subject', event.target.value)
+                                }
+                                className="mt-1"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                Mensaje
+                              </label>
+                              <textarea
+                                value={selectedTemplate.body}
+                                onChange={(event) =>
+                                  updateEmailTemplate('body', event.target.value)
+                                }
+                                className="mt-1 min-h-28 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                              <div>
+                                <p className="font-medium text-foreground">Estado</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Activa o desactiva esta automatización.
+                                </p>
+                              </div>
+
+                              <Button
+                                variant={selectedTemplate.active ? 'default' : 'outline'}
+                                onClick={() =>
+                                  updateEmailTemplate('active', !selectedTemplate.active)
+                                }
+                              >
+                                {selectedTemplate.active ? 'Activa' : 'Inactiva'}
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border bg-muted/40 p-4">
+                      <p className="text-sm font-medium text-foreground">
+                        Variables disponibles
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {['{{cliente}}', '{{factura}}', '{{total}}', '{{pedido}}', '{{saldo}}'].map(
+                          (variable) => (
+                            <Badge key={variable} variant="outline">
+                              {variable}
+                            </Badge>
+                          ),
+                        )}
+                      </div>
+
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Estas variables se reemplazan con datos reales al enviar el correo.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium text-foreground">Probar envío</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Usa la plantilla seleccionada para generar un correo de prueba.
+                      </p>
+
+                      <div className="mt-4 grid gap-3">
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Correo destino
+                          </label>
+                          <Input
+                            value={testEmail}
+                            onChange={(event) => setTestEmail(event.target.value)}
+                            placeholder="cliente@email.com"
+                            className="mt-1"
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={previewSelectedTemplate}>
+                            Previsualizar
+                          </Button>
+
+                          <Button onClick={sendTestEmail}>
+                            Enviar prueba
+                          </Button>
+                        </div>
+
+                        {emailPreview && (
+                          <pre className="whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-xs text-white">
+                            {emailPreview}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </section>
