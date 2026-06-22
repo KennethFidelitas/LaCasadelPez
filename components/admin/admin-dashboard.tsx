@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Minus,
   Plus,
+  Printer,
   Receipt,
   Search,
   Settings2,
@@ -854,6 +855,12 @@ async function sendTestEmail() {
                       <Button variant="outline" asChild>
                         <Link href="/inventario/consultar-animales">
                           Consultar Inventario
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/imprimir-reporte">
+                          <Printer className="h-4 w-4" />
+                          Imprimir Reporte
                         </Link>
                       </Button>
                     </div>

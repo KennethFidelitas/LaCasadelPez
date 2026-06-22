@@ -52,7 +52,7 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
             {animal.images?.[0] ? (
               <Image
                 src={animal.images[0]}
-                alt={animal.common_name}
+                alt={animal.common_name ?? 'Imagen de animal'}
                 fill
                 className="object-cover transition-transform group-hover:scale-105"
               />
