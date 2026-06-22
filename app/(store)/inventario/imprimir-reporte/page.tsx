@@ -126,7 +126,7 @@ export default function ImprimirReporteInventarioPage() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
         <Button variant="outline" asChild>
-          <Link href="/admin">Volver al panel</Link>
+          <Link href="/dashboard?modulo=inventory">Volver al panel</Link>
         </Button>
       </div>
     )
@@ -153,7 +153,7 @@ export default function ImprimirReporteInventarioPage() {
       <div className="print:hidden sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin">
+            <Link href="/dashboard?modulo=inventory">
               <ArrowLeft className="h-4 w-4" />
               Volver
             </Link>

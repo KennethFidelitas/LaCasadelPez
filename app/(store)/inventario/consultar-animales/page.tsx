@@ -101,7 +101,7 @@ export default function ConsultarInventarioAnimalesPage() {
           </div>
 
           <Link
-            href="/dashboard"
+            href="/dashboard?modulo=inventory"
             className="w-fit rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50"
           >
             Volver

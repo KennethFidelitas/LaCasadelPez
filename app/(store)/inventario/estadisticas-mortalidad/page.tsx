@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { getEstadisticasMortalidad } from '@/lib/inventario/actions'
 import {
@@ -65,15 +65,24 @@ export default function EstadisticasMortalidadPage({
       </nav>
 
       {/* Encabezado */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">
-          Estadísticas de mortalidad
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Analiza tendencias, causas y especies más afectadas. Por defecto
-          muestra los últimos 12 meses; usa el filtro de fechas para acotar el
-          período.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            Estadísticas de mortalidad
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Analiza tendencias, causas y especies más afectadas. Por defecto
+            muestra los últimos 12 meses; usa el filtro de fechas para acotar el
+            período.
+          </p>
+        </div>
+        <Link
+          href="/dashboard?modulo=inventory"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Volver
+        </Link>
       </div>
 
       {/* Dashboard con Suspense */}

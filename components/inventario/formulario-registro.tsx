@@ -261,7 +261,7 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push('/inventario/consultar-animales')}
+          onClick={() => router.push('/dashboard?modulo=inventory')}
         >
           Cancelar
         </Button>

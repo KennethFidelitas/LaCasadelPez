@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { getHistorialMuertes } from '@/lib/inventario/actions'
 import {
@@ -75,12 +75,21 @@ export default function HistorialMuertesPage({
       </nav>
 
       {/* Encabezado */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Historial de bajas</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Consulta y filtra todas las bajas de animales registradas. Usa los filtros
-          para acotar por fecha, especie o causa, y exporta los resultados a CSV.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Historial de bajas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Consulta y filtra todas las bajas de animales registradas. Usa los filtros
+            para acotar por fecha, especie o causa, y exporta los resultados a CSV.
+          </p>
+        </div>
+        <Link
+          href="/dashboard?modulo=inventory"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Volver
+        </Link>
       </div>
 
       {/* Tabla con Suspense */}
