@@ -878,6 +878,11 @@ async function sendTestEmail() {
                           Historial de Bajas
                         </Link>
                       </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/estadisticas-mortalidad">
+                          Estadísticas
+                        </Link>
+                      </Button>
                     </div>
                   </div>                  
                   </CardHeader>
