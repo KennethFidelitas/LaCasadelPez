@@ -863,6 +863,11 @@ async function sendTestEmail() {
                           Imprimir Reporte
                         </Link>
                       </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/registro-entrada">
+                          Registrar Entrada
+                        </Link>
+                      </Button>
                     </div>
                   </div>                  
                   </CardHeader>
