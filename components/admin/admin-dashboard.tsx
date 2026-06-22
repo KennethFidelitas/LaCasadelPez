@@ -868,6 +868,16 @@ async function sendTestEmail() {
                           Registrar Entrada
                         </Link>
                       </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/registro-muerte">
+                          Registrar Baja
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/historial-muertes">
+                          Historial de Bajas
+                        </Link>
+                      </Button>
                     </div>
                   </div>                  
                   </CardHeader>

@@ -29,3 +29,34 @@ export const registroEntradaSchema = z.object({
 })
 
 export type RegistroEntradaValues = z.infer<typeof registroEntradaSchema>
+
+// ─── RF-INV-006: Registro de muerte de animales ───────────────────────────────
+
+export const CAUSAS_MUERTE = [
+  'enfermedad',
+  'parametros_agua',
+  'traslado',
+  'causa_desconocida',
+  'otro',
+] as const
+
+export const CAUSA_MUERTE_LABELS: Record<typeof CAUSAS_MUERTE[number], string> = {
+  enfermedad: 'Enfermedad',
+  parametros_agua: 'Parámetros del agua',
+  traslado: 'Traslado',
+  causa_desconocida: 'Causa desconocida',
+  otro: 'Otro',
+}
+
+export const registroMuerteSchema = z.object({
+  animal_id: z.string().uuid({ message: 'Selecciona un animal válido' }),
+  quantity: z.coerce
+    .number({ invalid_type_error: 'Ingresa una cantidad' })
+    .int()
+    .min(1, 'La cantidad mínima es 1'),
+  recorded_at: z.string({ required_error: 'La fecha es requerida' }).min(1, 'La fecha es requerida'),
+  reason: z.enum(CAUSAS_MUERTE, { required_error: 'Selecciona una causa' }),
+  notes: z.string().max(1000).optional(),
+})
+
+export type RegistroMuerteValues = z.infer<typeof registroMuerteSchema>
