@@ -1,99 +1,144 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
 
-async function registrarAnimal(formData: FormData) {
-  "use server"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
-  const nombre = formData.get("nombre") as string
-  const nombreCientifico = formData.get("nombreCientifico") as string
-  const descripcion = formData.get("descripcion") as string
-  const precio = Number(formData.get("precio"))
-  const costo = Number(formData.get("costo"))
-  const nivelCuidado = formData.get("nivelCuidado") as string
-  const temperamento = formData.get("temperamento") as string
-  const dieta = formData.get("dieta") as string
-  const tamanioMinimo = Number(formData.get("tamanioMinimo")) || null
-  const temperaturaMin = Number(formData.get("temperaturaMin")) || null
-  const temperaturaMax = Number(formData.get("temperaturaMax")) || null
-  const phMin = Number(formData.get("phMin")) || null
-  const phMax = Number(formData.get("phMax")) || null
-  const tamanioMaximo = Number(formData.get("tamanioMaximo")) || null
-  const origen = formData.get("origen") as string
-  const esperanzaVida = formData.get("esperanzaVida") as string
-  const compatibilidad = formData.get("compatibilidad") as string
-  const imagenes = formData.get("imagenes") as string
-  const cantidad = Number(formData.get("cantidad"))
-  const ubicacion = formData.get("ubicacion") as string
-  const proveedor = formData.get("proveedor") as string
-  const esFeatured = formData.get("esFeatured") === "true"
+export default function EditarAnimalPage() {
+  const params = useParams()
+  const animalId = params?.id as string
+  const [animal, setAnimal] = useState<any>(null)
+  const [inventario, setInventario] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const slug = `${nombre}-${Date.now()}`
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+  useEffect(() => {
+    if (!animalId) return
 
-  const sku = `AN-${Date.now()}`
+    const cargarDatos = async () => {
+      try {
+        const supabase = createClient()
 
-  const supabase = await createClient()
+        // Cargar animal
+        const { data: animalData, error: animalError } = await supabase
+          .from("animals")
+          .select("*")
+          .eq("id", animalId)
+          .single()
 
-  // Insertar animal
-  const { data: animal, error: errorAnimal } = await supabase.from("animals").insert({
-    name: nombre,
-    slug: slug,
-    scientific_name: nombreCientifico || null,
-    description: descripcion,
-    price: precio,
-    cost: costo,
-    sku: sku,
-    care_level: nivelCuidado || null,
-    temperament: temperamento || null,
-    diet: dieta || null,
-    min_tank_size: tamanioMinimo,
-    temperature_min: temperaturaMin,
-    temperature_max: temperaturaMax,
-    ph_min: phMin,
-    ph_max: phMax,
-    max_size: tamanioMaximo,
-    origin: origen || null,
-    lifespan: esperanzaVida || null,
-    compatibility: compatibilidad 
-      ? compatibilidad.split(",").map((item: string) => item.trim())
-      : null,
-    images: imagenes ? imagenes.split(",").map((img: string) => img.trim()) : null,
-    is_active: true,
-    is_featured: esFeatured,
-  }).select()
+        if (animalError) throw animalError
 
-  if (errorAnimal) {
-    console.error("Error completo al registrar animal:", errorAnimal)
-    throw new Error(
-      `Error Supabase: ${errorAnimal.message} | Código: ${errorAnimal.code} | Detalle: ${errorAnimal.details}`
-    )
+        // Cargar inventario
+        const { data: inventarioData, error: inventarioError } = await supabase
+          .from("inventory")
+          .select("*")
+          .eq("animal_id", animalId)
+          .single()
+
+        setAnimal(animalData)
+        setInventario(inventarioData)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarDatos()
+  }, [animalId])
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSaving(true)
+
+    try {
+      const formData = new FormData(e.currentTarget)
+      const supabase = createClient()
+
+      console.log("🔍 Iniciando actualización del animal ID:", animalId)
+
+      // Actualizar animal
+      const { data: animalResult, error: errorAnimal } = await supabase
+        .from("animals")
+        .update({
+          name: formData.get("nombre"),
+          scientific_name: formData.get("nombreCientifico") || null,
+          description: formData.get("descripcion"),
+          price: Number(formData.get("precio")),
+          cost: Number(formData.get("costo")),
+          care_level: formData.get("nivelCuidado") || null,
+          temperament: formData.get("temperamento") || null,
+          diet: formData.get("dieta") || null,
+          min_tank_size: Number(formData.get("tamanioMinimo")) || null,
+          temperature_min: Number(formData.get("temperaturaMin")) || null,
+          temperature_max: Number(formData.get("temperaturaMax")) || null,
+          ph_min: Number(formData.get("phMin")) || null,
+          ph_max: Number(formData.get("phMax")) || null,
+          max_size: Number(formData.get("tamanioMaximo")) || null,
+          origin: formData.get("origen") || null,
+          lifespan: formData.get("esperanzaVida") || null,
+          compatibility: (formData.get("compatibilidad") as string)
+            ? (formData.get("compatibilidad") as string).split(",").map((item) => item.trim())
+            : null,
+          images: (formData.get("imagenes") as string)
+            ? (formData.get("imagenes") as string).split(",").map((img) => img.trim())
+            : null,
+          is_featured: formData.get("esFeatured") === "true",
+        })
+        .eq("id", animalId)
+        .select()
+
+      console.log("📊 Resultado animal:", { animalResult, errorAnimal })
+
+      if (errorAnimal) {
+        console.error("❌ Error al actualizar animal:", errorAnimal)
+        throw errorAnimal
+      }
+
+      console.log("✅ Animal actualizado:", animalResult)
+
+      // Actualizar inventario usando el ID del inventario
+      if (inventario?.id) {
+        console.log("🔍 Actualizando inventario ID:", inventario.id)
+
+        const { data: inventoryResult, error: errorInventario } = await supabase
+          .from("inventory")
+          .update({
+            quantity: Number(formData.get("cantidad")),
+            location: formData.get("ubicacion"),
+          })
+          .eq("id", inventario.id)
+          .select()
+
+        console.log("📊 Resultado inventario:", { inventoryResult, errorInventario })
+
+        if (errorInventario) {
+          console.error("❌ Error al actualizar inventario:", errorInventario)
+          throw errorInventario
+        }
+
+        console.log("✅ Inventario actualizado:", inventoryResult)
+      } else {
+        console.warn("⚠️ No hay ID de inventario disponible")
+      }
+
+      alert("✅ Animal actualizado correctamente")
+      setTimeout(() => {
+        window.location.href = "/inventario/consultar-animales"
+      }, 500)
+    } catch (err: any) {
+      console.error("🔴 Error completo:", err)
+      alert(`❌ Error: ${err.message}`)
+      setSaving(false)
+    }
   }
 
-  const animalId = animal[0].id
+  if (loading) return <div className="p-8">Cargando...</div>
+  if (error) return <div className="p-8 text-red-600">Error: {error}</div>
+  if (!animal) return <div className="p-8">Animal no encontrado</div>
 
-  // Insertar inventario
-  const { error: errorInventario } = await supabase.from("inventory").insert({
-    animal_id: animalId,
-    quantity: cantidad,
-    location: ubicacion,
-    low_stock_threshold: 5,
-  })
-
-  if (errorInventario) {
-    console.error("Error completo al registrar inventario:", errorInventario)
-    throw new Error(
-      `Error Supabase inventario: ${errorInventario.message} | Código: ${errorInventario.code} | Detalle: ${errorInventario.details}`
-    )
-  }
-
-  redirect("/dashboard")
-}
-
-export default function AgregarAnimalPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-2xl">
@@ -101,23 +146,23 @@ export default function AgregarAnimalPage() {
           <p className="text-sm text-slate-500">Inventario</p>
 
           <h1 className="text-2xl font-bold">
-            Registrar nuevo animal
+            Editar animal: {animal.name}
           </h1>
 
           <p className="text-slate-600">
-            Complete todos los campos para agregar un nuevo animal a la base de datos. Los campos marcados con * son obligatorios.
+            Modifique los campos necesarios y guarde los cambios.
           </p>
         </div>
 
         <form
-          action={registrarAnimal}
+          onSubmit={handleSubmit}
           className="rounded-xl border bg-white p-6 shadow-sm"
         >
           <div className="grid gap-6">
             {/* Información básica */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Información básica</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
@@ -125,8 +170,8 @@ export default function AgregarAnimalPage() {
                   </label>
                   <input
                     name="nombre"
+                    defaultValue={animal.name}
                     required
-                    placeholder="Ej: Betta Halfmoon"
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -137,7 +182,7 @@ export default function AgregarAnimalPage() {
                   </label>
                   <input
                     name="nombreCientifico"
-                    placeholder="Ej: Betta splendens"
+                    defaultValue={animal.scientific_name || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -148,8 +193,8 @@ export default function AgregarAnimalPage() {
                   </label>
                   <textarea
                     name="descripcion"
+                    defaultValue={animal.description || ""}
                     required
-                    placeholder="Descripción del animal"
                     className="w-full rounded-md border px-3 py-2"
                     rows={3}
                   />
@@ -163,10 +208,9 @@ export default function AgregarAnimalPage() {
                     <input
                       name="precio"
                       type="number"
-                      min="0"
                       step="0.01"
+                      defaultValue={animal.price}
                       required
-                      placeholder="₡"
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -178,10 +222,9 @@ export default function AgregarAnimalPage() {
                     <input
                       name="costo"
                       type="number"
-                      min="0"
                       step="0.01"
+                      defaultValue={animal.cost}
                       required
-                      placeholder="₡"
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -192,6 +235,7 @@ export default function AgregarAnimalPage() {
                     name="esFeatured"
                     type="checkbox"
                     value="true"
+                    defaultChecked={animal.is_featured}
                     id="featured"
                     className="h-4 w-4 rounded border-gray-300"
                   />
@@ -202,10 +246,10 @@ export default function AgregarAnimalPage() {
               </div>
             </div>
 
-            {/* Características del animal */}
+            {/* Características */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Características</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
@@ -213,6 +257,7 @@ export default function AgregarAnimalPage() {
                   </label>
                   <select
                     name="nivelCuidado"
+                    defaultValue={animal.care_level || ""}
                     className="w-full rounded-md border px-3 py-2"
                   >
                     <option value="">Seleccione...</option>
@@ -228,6 +273,7 @@ export default function AgregarAnimalPage() {
                   </label>
                   <select
                     name="temperamento"
+                    defaultValue={animal.temperament || ""}
                     className="w-full rounded-md border px-3 py-2"
                   >
                     <option value="">Seleccione...</option>
@@ -243,7 +289,7 @@ export default function AgregarAnimalPage() {
                   </label>
                   <input
                     name="dieta"
-                    placeholder="Ej: Omnívoro, Carnívoro"
+                    defaultValue={animal.diet || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -254,7 +300,7 @@ export default function AgregarAnimalPage() {
                   </label>
                   <input
                     name="origen"
-                    placeholder="Ej: Sudamérica"
+                    defaultValue={animal.origin || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -265,18 +311,18 @@ export default function AgregarAnimalPage() {
                   </label>
                   <input
                     name="esperanzaVida"
-                    placeholder="Ej: 3-5 años"
+                    defaultValue={animal.lifespan || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Compatibilidad
+                    Compatibilidad (separadas por coma)
                   </label>
                   <textarea
                     name="compatibilidad"
-                    placeholder="Especies compatibles y restricciones"
+                    defaultValue={animal.compatibility?.join(", ") || ""}
                     className="w-full rounded-md border px-3 py-2"
                     rows={2}
                   />
@@ -287,17 +333,16 @@ export default function AgregarAnimalPage() {
             {/* Parámetros del acuario */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Parámetros del acuario</h3>
-              
+
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Tamaño mínimo del acuario (litros)
+                    Tamaño mínimo (litros)
                   </label>
                   <input
                     name="tamanioMinimo"
                     type="number"
-                    min="0"
-                    placeholder="Ej: 20"
+                    defaultValue={animal.min_tank_size || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -310,9 +355,8 @@ export default function AgregarAnimalPage() {
                     <input
                       name="temperaturaMin"
                       type="number"
-                      min="0"
                       step="0.1"
-                      placeholder="Ej: 24"
+                      defaultValue={animal.temperature_min || ""}
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -324,9 +368,8 @@ export default function AgregarAnimalPage() {
                     <input
                       name="temperaturaMax"
                       type="number"
-                      min="0"
                       step="0.1"
-                      placeholder="Ej: 28"
+                      defaultValue={animal.temperature_max || ""}
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -340,10 +383,8 @@ export default function AgregarAnimalPage() {
                     <input
                       name="phMin"
                       type="number"
-                      min="0"
-                      max="14"
                       step="0.1"
-                      placeholder="Ej: 6.0"
+                      defaultValue={animal.ph_min || ""}
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -355,10 +396,8 @@ export default function AgregarAnimalPage() {
                     <input
                       name="phMax"
                       type="number"
-                      min="0"
-                      max="14"
                       step="0.1"
-                      placeholder="Ej: 7.5"
+                      defaultValue={animal.ph_max || ""}
                       className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -366,14 +405,13 @@ export default function AgregarAnimalPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Tamaño máximo del animal (cm)
+                    Tamaño máximo (cm)
                   </label>
                   <input
                     name="tamanioMaximo"
                     type="number"
-                    min="0"
                     step="0.1"
-                    placeholder="Ej: 8"
+                    defaultValue={animal.max_size || ""}
                     className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -383,7 +421,7 @@ export default function AgregarAnimalPage() {
             {/* Inventario y logística */}
             <div className="border-b pb-6">
               <h3 className="mb-4 text-lg font-semibold">Inventario y logística</h3>
-              
+
               <div className="grid gap-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
@@ -393,7 +431,8 @@ export default function AgregarAnimalPage() {
                     <input
                       name="cantidad"
                       type="number"
-                      min="1"
+                      min="0"
+                      defaultValue={inventario?.quantity || 0}
                       required
                       className="w-full rounded-md border px-3 py-2"
                     />
@@ -405,6 +444,7 @@ export default function AgregarAnimalPage() {
                     </label>
                     <select
                       name="ubicacion"
+                      defaultValue={inventario?.location || ""}
                       required
                       className="w-full rounded-md border px-3 py-2"
                     >
@@ -419,22 +459,11 @@ export default function AgregarAnimalPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Proveedor
-                  </label>
-                  <input
-                    name="proveedor"
-                    placeholder="Nombre del proveedor"
-                    className="w-full rounded-md border px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
                     Imágenes (URLs separadas por coma)
                   </label>
                   <textarea
                     name="imagenes"
-                    placeholder="https://ejemplo.com/imagen1.jpg, https://ejemplo.com/imagen2.jpg"
+                    defaultValue={animal.images?.join(", ") || ""}
                     className="w-full rounded-md border px-3 py-2"
                     rows={2}
                   />
@@ -442,20 +471,21 @@ export default function AgregarAnimalPage() {
               </div>
             </div>
 
-            {/* Botones de acción */}
+            {/* Botones */}
             <div className="flex justify-end gap-3 pt-4">
-              <a
+              <Link
                 href="/dashboard"
                 className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
-              </a>
+              </Link>
 
               <button
                 type="submit"
-                className="rounded-md bg-[#006f95] px-4 py-2 text-sm font-medium text-white hover:bg-[#005f80]"
+                disabled={saving}
+                className="rounded-md bg-[#006f95] px-4 py-2 text-sm font-medium text-white hover:bg-[#005f80] disabled:bg-slate-400"
               >
-                Guardar animal
+                {saving ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
           </div>

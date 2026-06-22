@@ -1,44 +1,68 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 export default function ConsultarCreditosPage() {
-  const creditos = [
-    {
-      id: 1,
-      numero: "CR-0001",
-      cliente: "Carlos Araya",
-      cedula: "1-1234-0567",
-      fecha: "2026-05-30",
-      montoOriginal: 125000,
-      abonos: 40000,
-      saldo: 85000,
-      estado: "Activo",
-      vendedor: "Vendedor Demo",
-    },
-    {
-      id: 2,
-      numero: "CR-0002",
-      cliente: "Valeria Mora",
-      cedula: "2-0456-0789",
-      fecha: "2026-05-28",
-      montoOriginal: 78000,
-      abonos: 78000,
-      saldo: 0,
-      estado: "Cancelado",
-      vendedor: "Vendedor Demo",
-    },
-    {
-      id: 3,
-      numero: "CR-0003",
-      cliente: "Andrea Coto",
-      cedula: "3-0987-0123",
-      fecha: "2026-05-25",
-      montoOriginal: 95000,
-      abonos: 25000,
-      saldo: 70000,
-      estado: "Activo",
-      vendedor: "Vendedor Demo",
-    },
-  ]
+  const [creditos, setCreditos] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    const cargarCreditos = async () => {
+      try {
+        const supabase = createClient()
+
+        console.log("🔍 Intentando cargar créditos...")
+
+        // Obtener créditos con información del cliente
+        const { data, error } = await supabase
+          .from("credits")
+          .select(`
+            id,
+            user_id,
+            amount,
+            balance,
+            type,
+            description,
+            created_at
+          `)
+          .order("created_at", { ascending: false })
+
+        if (error) {
+          console.error("❌ Error de Supabase:", error)
+          throw error
+        }
+
+        console.log("✅ Créditos cargados:", data)
+        setCreditos(data || [])
+      } catch (err: any) {
+        console.error("🔴 Error completo cargando créditos:", err)
+        console.error("Mensaje:", err?.message)
+        console.error("Código:", err?.code)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarCreditos()
+  }, [])
+
+  const creditosFiltrados = creditos.filter((credito) => {
+    const searchLower = searchTerm.toLowerCase()
+    const tipo = (credito.type || "").toLowerCase()
+    const descripcion = (credito.description || "").toLowerCase()
+    return tipo.includes(searchLower) || descripcion.includes(searchLower)
+  })
+
+  const totalCreditos = creditos.length
+  const creditosActivos = creditos.filter((c) => c.balance > 0).length
+  const saldoTotal = creditos.reduce((total, credito) => total + (credito.balance || 0), 0)
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("es-ES")
+  }
 
   return (
     <main className="min-h-screen p-8">
@@ -68,23 +92,18 @@ export default function ConsultarCreditosPage() {
         <section className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Créditos registrados</p>
-            <p className="mt-2 text-2xl font-bold">{creditos.length}</p>
+            <p className="mt-2 text-2xl font-bold">{totalCreditos}</p>
           </div>
 
           <div className="rounded-xl border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Créditos activos</p>
-            <p className="mt-2 text-2xl font-bold">
-              {creditos.filter((credito) => credito.estado === "Activo").length}
-            </p>
+            <p className="mt-2 text-2xl font-bold">{creditosActivos}</p>
           </div>
 
           <div className="rounded-xl border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Saldo total pendiente</p>
             <p className="mt-2 text-2xl font-bold">
-              ₡
-              {creditos
-                .reduce((total, credito) => total + credito.saldo, 0)
-                .toLocaleString()}
+              ₡{saldoTotal.toLocaleString()}
             </p>
           </div>
         </section>
@@ -101,60 +120,72 @@ export default function ConsultarCreditosPage() {
             </div>
 
             <input
-              placeholder="Buscar por cliente, cédula o número de crédito"
+              placeholder="Buscar por tipo o descripción"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-md border px-3 py-2 md:max-w-md"
             />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="py-3">N° Crédito</th>
-                  <th className="py-3">Cliente</th>
-                  <th className="py-3">Cédula</th>
-                  <th className="py-3">Fecha</th>
-                  <th className="py-3">Monto original</th>
-                  <th className="py-3">Abonos</th>
-                  <th className="py-3">Saldo</th>
-                  <th className="py-3">Estado</th>
-                  <th className="py-3">Vendedor</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {creditos.map((credito) => (
-                  <tr key={credito.id} className="border-b last:border-0">
-                    <td className="py-3 font-medium">{credito.numero}</td>
-                    <td className="py-3">{credito.cliente}</td>
-                    <td className="py-3 text-slate-500">{credito.cedula}</td>
-                    <td className="py-3">{credito.fecha}</td>
-                    <td className="py-3">
-                      ₡{credito.montoOriginal.toLocaleString()}
-                    </td>
-                    <td className="py-3">
-                      ₡{credito.abonos.toLocaleString()}
-                    </td>
-                    <td className="py-3 font-medium">
-                      ₡{credito.saldo.toLocaleString()}
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={
-                          credito.estado === "Activo"
-                            ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
-                            : "rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
-                        }
-                      >
-                        {credito.estado}
-                      </span>
-                    </td>
-                    <td className="py-3">{credito.vendedor}</td>
+          {loading ? (
+            <div className="py-8 text-center text-slate-500">Cargando créditos...</div>
+          ) : creditosFiltrados.length === 0 ? (
+            <div className="py-8 text-center text-slate-500">
+              {creditos.length === 0 ? "No hay créditos registrados" : "No se encontraron resultados"}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-3">Usuario ID</th>
+                    <th className="py-3">Tipo</th>
+                    <th className="py-3">Monto</th>
+                    <th className="py-3">Saldo</th>
+                    <th className="py-3">Descripción</th>
+                    <th className="py-3">Estado</th>
+                    <th className="py-3">Fecha</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {creditosFiltrados.map((credito) => {
+                    const saldo = credito.balance || 0
+                    const monto = credito.amount || 0
+                    const estaActivo = saldo > 0
+
+                    return (
+                      <tr key={credito.id} className="border-b last:border-0">
+                        <td className="py-3 font-medium text-xs">{credito.user_id || "-"}</td>
+                        <td className="py-3">{credito.type || "-"}</td>
+                        <td className="py-3">₡{monto.toLocaleString()}</td>
+                        <td className="py-3 font-medium">
+                          ₡{saldo.toLocaleString()}
+                        </td>
+                        <td className="py-3 text-slate-500">
+                          {credito.description || "-"}
+                        </td>
+                        <td className="py-3">
+                          <span
+                            className={
+                              estaActivo
+                                ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
+                                : "rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
+                            }
+                          >
+                            {estaActivo ? "Activo" : "Cancelado"}
+                          </span>
+                        </td>
+                        <td className="py-3 text-slate-500">
+                          {formatDate(credito.created_at)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
     </main>
