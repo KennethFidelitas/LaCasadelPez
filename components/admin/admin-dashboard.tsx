@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Activity,
@@ -181,6 +181,13 @@ const initialEmailTemplates: EmailTemplate[] = [
 
 export function AdminDashboard() {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
+
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('modulo')
+    if (param && modules.some((m) => m.key === param)) {
+      setActiveModule(param as ModuleKey)
+    }
+  }, [])
   const [cartItems, setCartItems] = useState<CartItem[]>([
     { ...posCatalog[0], quantity: 1 },
     { ...posCatalog[4], quantity: 3 },
@@ -866,6 +873,21 @@ async function sendTestEmail() {
                       <Button variant="outline" asChild>
                         <Link href="/inventario/registro-entrada">
                           Registrar Entrada
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/registro-muerte">
+                          Registrar Baja
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/historial-muertes">
+                          Historial de Bajas
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/inventario/estadisticas-mortalidad">
+                          Estadísticas
                         </Link>
                       </Button>
                     </div>

@@ -250,6 +250,32 @@ export interface PosSession {
   notes: string | null
 }
 
+export interface Inventory {
+  id: string
+  animal_id: string
+  quantity: number
+  location: string | null
+  low_stock_threshold: number
+}
+
+export interface AnimalMortality {
+  id: string
+  animal_id: string
+  quantity: number
+  reason: string
+  notes: string | null
+  recorded_by: string | null
+  recorded_at: string | null
+  created_at: string | null
+}
+
+export interface MuerteConAnimal extends AnimalMortality {
+  animals: {
+    name: string
+    scientific_name: string | null
+  } | null
+}
+
 // Utility types
 export type OrderStatus = Order['status']
 export type PaymentStatus = Order['payment_status']

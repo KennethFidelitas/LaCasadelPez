@@ -74,7 +74,7 @@ export default function ModificarLotePage() {
             </div>
 
             <Link
-              href="/dashboard"
+              href="/dashboard?modulo=inventory"
               className="rounded-md border px-4 py-2 text-sm font-medium"
             >
               Volver

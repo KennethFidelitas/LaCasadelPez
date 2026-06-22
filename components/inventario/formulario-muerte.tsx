@@ -8,8 +8,13 @@ import { toast } from 'sonner'
 import { Check, ChevronsUpDown, Package } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { registroEntradaSchema, type RegistroEntradaValues } from '@/lib/inventario/schemas'
-import { registrarEntradaAnimal } from '@/lib/inventario/actions'
+import {
+  registroMuerteSchema,
+  type RegistroMuerteValues,
+  CAUSAS_MUERTE,
+  CAUSA_MUERTE_LABELS,
+} from '@/lib/inventario/schemas'
+import { registrarMuerteAnimal } from '@/lib/inventario/actions'
 
 import { Button } from '@/components/ui/actions/button'
 import { Input } from '@/components/ui/forms/input'
@@ -30,6 +35,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/overlays/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/forms/select'
 
 interface AnimalConStock {
   id: string
@@ -38,11 +50,11 @@ interface AnimalConStock {
   inventory: { quantity: number; location: string | null }[] | null
 }
 
-interface FormularioRegistroProps {
+interface FormularioMuerteProps {
   animales: AnimalConStock[]
 }
 
-export function FormularioRegistro({ animales }: FormularioRegistroProps) {
+export function FormularioMuerte({ animales }: FormularioMuerteProps) {
   const router = useRouter()
   const [comboboxAbierto, setComboboxAbierto] = useState(false)
 
@@ -53,32 +65,47 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
     handleSubmit,
     control,
     watch,
+    reset,
     formState: { errors, isSubmitting },
-  } = useForm<RegistroEntradaValues>({
-    resolver: zodResolver(registroEntradaSchema),
+  } = useForm<RegistroMuerteValues>({
+    resolver: zodResolver(registroMuerteSchema),
     defaultValues: {
       animal_id: '',
-      purchase_price: 0,
-      supplier: '',
-      entry_date: today,
+      recorded_at: today,
       notes: '',
     },
   })
 
   const animalIdSeleccionado = watch('animal_id')
+  const cantidadIngresada = watch('quantity')
   const animalSeleccionado = animales.find((a) => a.id === animalIdSeleccionado)
   const stockActual = animalSeleccionado?.inventory?.[0]?.quantity ?? null
 
-  async function onSubmit(values: RegistroEntradaValues) {
-    try {
-      await registrarEntradaAnimal(values)
-      toast.success('Entrada registrada correctamente')
-      router.push('/inventario/consultar-animales')
-      router.refresh()
-    } catch (err) {
-      toast.error('No se pudo registrar la entrada')
-      console.error(err)
+  async function onSubmit(values: RegistroMuerteValues) {
+    // Guardia cliente: evita round-trip innecesario si ya supera el stock
+    if (stockActual !== null && values.quantity > stockActual) {
+      toast.error(`La cantidad no puede superar el stock actual (${stockActual})`)
+      return
     }
+
+    const result = await registrarMuerteAnimal(values)
+
+    if (!result.success) {
+      toast.error(result.error ?? 'No se pudo registrar la baja')
+      return
+    }
+
+    toast.success(
+      `Se registró la baja de ${values.quantity} animal${values.quantity !== 1 ? 'es' : ''}`,
+    )
+
+    // Limpiar formulario para registrar otra baja
+    reset({
+      animal_id: '',
+      recorded_at: new Date().toLocaleDateString('en-CA'),
+      notes: '',
+    })
+    router.refresh()
   }
 
   return (
@@ -123,7 +150,7 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
                     <Command>
                       <CommandInput placeholder="Buscar por nombre o SKU…" />
                       <CommandList>
-                        <CommandEmpty>No se encontraron animales.</CommandEmpty>
+                        <CommandEmpty>No se encontraron animales con stock disponible.</CommandEmpty>
                         <CommandGroup>
                           {animales.map((animal) => (
                             <CommandItem
@@ -156,11 +183,11 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
             )}
           </div>
 
-          {/* Badge de stock actual — aparece al seleccionar un animal */}
+          {/* Badge de stock actual — visible solo al seleccionar un animal */}
           {animalSeleccionado && (
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
               <Package className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Stock actual:</span>
+              <span className="text-muted-foreground">Stock disponible:</span>
               <Badge variant={stockActual !== null && stockActual < 5 ? 'destructive' : 'secondary'}>
                 {stockActual ?? 0} unidades
               </Badge>
@@ -174,10 +201,10 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
         </CardContent>
       </Card>
 
-      {/* Detalles de la entrada */}
+      {/* Detalles de la baja */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Detalles de la entrada</CardTitle>
+          <CardTitle className="text-base">Detalles de la baja</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {/* Cantidad */}
@@ -189,57 +216,65 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
               id="quantity"
               type="number"
               min="1"
-              placeholder="Ej: 10"
+              max={stockActual ?? undefined}
+              placeholder="Ej: 3"
               {...register('quantity')}
               aria-invalid={!!errors.quantity}
             />
             {errors.quantity && (
               <p className="text-xs text-destructive">{errors.quantity.message}</p>
             )}
+            {stockActual !== null &&
+              cantidadIngresada > 0 &&
+              cantidadIngresada > stockActual && (
+                <p className="text-xs text-destructive">
+                  No puede superar el stock actual ({stockActual})
+                </p>
+              )}
           </div>
 
-          {/* Precio de compra */}
+          {/* Fecha */}
           <div className="space-y-1.5">
-            <Label htmlFor="purchase_price">
-              Precio de compra (₡) <span className="text-destructive">*</span>
+            <Label htmlFor="recorded_at">
+              Fecha <span className="text-destructive">*</span>
             </Label>
             <Input
-              id="purchase_price"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              {...register('purchase_price')}
-              aria-invalid={!!errors.purchase_price}
+              id="recorded_at"
+              type="date"
+              max={today}
+              {...register('recorded_at')}
+              aria-invalid={!!errors.recorded_at}
             />
-            {errors.purchase_price && (
-              <p className="text-xs text-destructive">{errors.purchase_price.message}</p>
+            {errors.recorded_at && (
+              <p className="text-xs text-destructive">{errors.recorded_at.message}</p>
             )}
           </div>
 
-          {/* Proveedor */}
-          <div className="space-y-1.5">
-            <Label htmlFor="supplier">Proveedor</Label>
-            <Input
-              id="supplier"
-              placeholder="Nombre del proveedor"
-              {...register('supplier')}
-            />
-          </div>
-
-          {/* Fecha de entrada */}
-          <div className="space-y-1.5">
-            <Label htmlFor="entry_date">
-              Fecha de entrada <span className="text-destructive">*</span>
+          {/* Causa */}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>
+              Causa <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="entry_date"
-              type="date"
-              {...register('entry_date')}
-              aria-invalid={!!errors.entry_date}
+            <Controller
+              name="reason"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-invalid={!!errors.reason} className="w-full">
+                    <SelectValue placeholder="Seleccionar causa…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CAUSAS_MUERTE.map((causa) => (
+                      <SelectItem key={causa} value={causa}>
+                        {CAUSA_MUERTE_LABELS[causa]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
-            {errors.entry_date && (
-              <p className="text-xs text-destructive">{errors.entry_date.message}</p>
+            {errors.reason && (
+              <p className="text-xs text-destructive">{errors.reason.message}</p>
             )}
           </div>
 
@@ -248,7 +283,7 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
             <Label htmlFor="notes">Notas</Label>
             <Textarea
               id="notes"
-              placeholder="Observaciones sobre esta entrada…"
+              placeholder="Observaciones sobre esta baja…"
               rows={3}
               {...register('notes')}
             />
@@ -266,7 +301,7 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
           Cancelar
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Registrando…' : 'Registrar entrada'}
+          {isSubmitting ? 'Registrando…' : 'Registrar baja'}
         </Button>
       </div>
     </form>

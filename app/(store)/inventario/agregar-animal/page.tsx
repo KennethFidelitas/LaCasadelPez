@@ -445,7 +445,7 @@ export default function AgregarAnimalPage() {
             {/* Botones de acción */}
             <div className="flex justify-end gap-3 pt-4">
               <a
-                href="/dashboard"
+                href="/dashboard?modulo=inventory"
                 className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
