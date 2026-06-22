@@ -22,6 +22,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
@@ -188,6 +189,49 @@ export function AdminDashboard() {
       setActiveModule(param as ModuleKey)
     }
   }, [])
+
+  useEffect(() => {
+    type AnimalRow = {
+      id: string
+      name: string
+      sku: string
+      cost: number | null
+      care_level: string | null
+      inventory: { quantity: number; location: string | null; low_stock_threshold: number }[] | null
+    }
+
+    async function cargarInventario() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('animals')
+          .select('id, name, sku, cost, care_level, inventory(quantity, location, low_stock_threshold)')
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+
+        if (error) throw error
+
+        const items: InventoryItem[] = ((data ?? []) as AnimalRow[]).map((a) => ({
+          id: a.id,
+          name: a.name,
+          sku: a.sku,
+          category: a.care_level ?? '—',
+          stock: a.inventory?.[0]?.quantity ?? 0,
+          min: a.inventory?.[0]?.low_stock_threshold ?? 5,
+          location: a.inventory?.[0]?.location ?? '—',
+          cost: a.cost ?? 0,
+        }))
+
+        setInventoryItems(items)
+      } catch (err) {
+        console.error('Error al cargar inventario:', err)
+      } finally {
+        setInventarioLoading(false)
+      }
+    }
+
+    cargarInventario()
+  }, [])
   const [cartItems, setCartItems] = useState<CartItem[]>([
     { ...posCatalog[0], quantity: 1 },
     { ...posCatalog[4], quantity: 3 },
@@ -203,7 +247,8 @@ export function AdminDashboard() {
   const [openingCash, setOpeningCash] = useState(120000)
   const [closingCash, setClosingCash] = useState(0)
   const [cashNotes, setCashNotes] = useState("")
-  const [inventoryItems, setInventoryItems] = useState(initialInventory)
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+  const [inventarioLoading, setInventarioLoading] = useState(true)
   const [inventorySearch, setInventorySearch] = useState('')
   const [orders, setOrders] = useState(initialOrders)
   const [emailTemplates, setEmailTemplates] = useState(initialEmailTemplates)
@@ -919,7 +964,19 @@ async function sendTestEmail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredInventory.map((item) => (
+                        {inventarioLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                              Cargando inventario…
+                            </TableCell>
+                          </TableRow>
+                        ) : filteredInventory.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                              {inventorySearch ? 'Sin resultados para la búsqueda.' : 'No hay animales en inventario.'}
+                            </TableCell>
+                          </TableRow>
+                        ) : filteredInventory.map((item) => (
                           <TableRow key={item.id}>
                             <TableCell>
                               <div className="font-medium">{item.name}</div>
