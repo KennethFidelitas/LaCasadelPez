@@ -135,13 +135,13 @@ export default function MortalidadPage() {
               Actualizar
             </button>
             <Link
-              href="/inventario/reporte-mortalidad"
+              href="/reporte-mortalidad"
               className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
               Ver reporte
             </Link>
             <Link
-              href="/inventario/mortalidad/registrar"
+              href="/mortalidad/registrar"
               className="flex items-center gap-1.5 rounded-md bg-[#006f95] px-4 py-2 text-sm font-medium text-white hover:bg-[#005f80]"
             >
               <Plus className="h-4 w-4" />
