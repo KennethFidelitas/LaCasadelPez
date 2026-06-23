@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import {
   Instagram, MapPin, Mail, CheckCircle2, ExternalLink,
-  BarChart2, Bell, Globe, ChevronRight, Save
+  BarChart2, Bell, Globe, ChevronRight, Save, AlertTriangle
 } from 'lucide-react'
 
 type Tab = 'redes' | 'mapas' | 'email'
@@ -35,24 +36,27 @@ type EmailState = {
   plantillaOrdenProduccion: boolean
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 // ── Componente ────────────────────────────────────────────────
 export default function MarketingPage() {
   const [tab, setTab] = useState<Tab>('redes')
+  const [loading, setLoading] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const [redes, setRedes] = useState<RedesState>({
-    instagram: '@lacasadelpez',
-    facebook: 'La Casa del Pez',
+    instagram: '',
+    facebook: '',
     tiktok: '',
-    autoPublish: true,
+    autoPublish: false,
   })
 
   const [mapas, setMapas] = useState<MapasState>({
-    nombre: 'La Casa del Pez',
-    direccion: 'San José, Costa Rica',
-    telefono: '+506 2222-3333',
-    sitioWeb: 'https://lacasadelpez.cr',
+    nombre: '',
+    direccion: '',
+    telefono: '',
+    sitioWeb: '',
     googleMapsUrl: '',
     wazeUrl: '',
     horaApertura: '08:00',
@@ -60,21 +64,55 @@ export default function MarketingPage() {
   })
 
   const [emailCfg, setEmailCfg] = useState<EmailState>({
-    emailSoporte: 'soporte@lacasadelpez.cr',
-    plantillaConfirmacion: true,
-    plantillaAlertaStock: true,
-    plantillaVencimientoApartado: true,
+    emailSoporte: '',
+    plantillaConfirmacion: false,
+    plantillaAlertaStock: false,
+    plantillaVencimientoApartado: false,
     plantillaOrdenProduccion: false,
   })
 
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const supabase = createClient()
 
-  const handleSave = () => {
+  // ── Cargar datos al montar ────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('store_settings')
+        .select('redes, mapas, email')
+        .eq('id', 'singleton')
+        .single()
+
+      if (!error && data) {
+        if (data.redes)  setRedes(data.redes)
+        if (data.mapas)  setMapas(data.mapas)
+        if (data.email)  setEmailCfg(data.email)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  // ── Guardar en Supabase ───────────────────────────────────
+  const handleSave = async () => {
     setSaveStatus('saving')
-    setTimeout(() => {
+    setErrorMsg('')
+
+    const { error } = await supabase
+      .from('store_settings')
+      .upsert({
+        id: 'singleton',
+        redes,
+        mapas,
+        email: emailCfg,
+      })
+
+    if (error) {
+      setErrorMsg(error.message)
+      setSaveStatus('error')
+    } else {
       setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2200)
-    }, 800)
+      setTimeout(() => setSaveStatus('idle'), 2500)
+    }
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -105,11 +143,21 @@ export default function MarketingPage() {
               <>Guardando…</>
             ) : saveStatus === 'saved' ? (
               <><CheckCircle2 className="h-4 w-4" /> Guardado</>
+            ) : saveStatus === 'error' ? (
+              <><AlertTriangle className="h-4 w-4" /> Reintentar</>
             ) : (
               <><Save className="h-4 w-4" /> Guardar cambios</>
             )}
           </button>
         </div>
+
+        {/* Feedback banners */}
+        {saveStatus === 'error' && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {errorMsg || 'Ocurrió un error al guardar.'}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 rounded-xl border bg-white p-1 shadow-sm">
@@ -129,6 +177,12 @@ export default function MarketingPage() {
           ))}
         </div>
 
+        {loading ? (
+          <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+            Cargando configuración…
+          </div>
+        ) : (
+        <>
         {/* ── REDES SOCIALES (#60) ── */}
         {tab === 'redes' && (
           <div className="space-y-4">
@@ -306,9 +360,7 @@ export default function MarketingPage() {
                     </a>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Registra tu negocio en <a href="https://business.google.com" target="_blank" rel="noopener noreferrer" className="underline">Google Business Profile</a> y pega el link aquí.
-                </p>
+                
               </div>
 
               {/* Waze */}
@@ -330,9 +382,7 @@ export default function MarketingPage() {
                     </a>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Registra en <a href="https://www.waze.com/en/business" target="_blank" rel="noopener noreferrer" className="underline">Waze for Business</a> y pega el link aquí.
-                </p>
+                
               </div>
             </div>
 
@@ -447,6 +497,7 @@ export default function MarketingPage() {
             </div>
 
             {/* Info */}
+            {/*
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
               <p className="font-medium mb-1">📌 Nota de integración</p>
               <p className="text-xs leading-relaxed">
@@ -455,7 +506,10 @@ export default function MarketingPage() {
                 o el proveedor SMTP de tu preferencia en el servidor.
               </p>
             </div>
+            */}
           </div>
+        )}
+        </>
         )}
       </div>
     </main>

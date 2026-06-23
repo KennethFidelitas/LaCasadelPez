@@ -492,6 +492,15 @@ export function AdminDashboard() {
                           Consultar Inventario
                         </Link>
                       </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/mortalidad">Gráficos mortalidad</Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/stock-minimo">Stock mínimo</Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/reporte-mortalidad">Reporte mortalidad</Link>
+                      </Button>
                     </div>
                   </div>                  
                   </CardHeader>
@@ -759,6 +768,13 @@ export function AdminDashboard() {
                     <SettingRow title="Caja y terminales" detail="Montos iniciales, cierres y responsables." />
                     <SettingRow title="Impuestos y descuentos" detail="Reglas para venta directa y e-commerce." />
                     <SettingRow title="Permisos" detail="Administrador, caja, inventario y produccion." />
+                    <div className="pt-2">
+                      <Button variant="outline" asChild>
+                        <Link href="/admin/marketing">
+                          Marketing Digital
+                        </Link>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </section>

@@ -44,7 +44,7 @@ export default function ReporteMortalidadPage() {
       .from('animal_mortality')
       .select(`
         id, recorded_at, quantity, reason, notes,
-        animals!inner(common_name, sku)
+        animals!inner(name, sku)
       `)
       .order('recorded_at', { ascending: false })
 
@@ -61,7 +61,7 @@ export default function ReporteMortalidadPage() {
         quantity: r.quantity,
         reason: r.reason ?? 'desconocido',
         notes: r.notes,
-        animal_name: r.animals?.common_name ?? '—',
+        animal_name: r.animals?.name ?? '—',
         sku: r.animals?.sku ?? '—',
       }))
 

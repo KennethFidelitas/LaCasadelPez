@@ -37,7 +37,7 @@ export default function StockMinimoPage() {
         quantity,
         low_stock_threshold,
         location,
-        animals!inner(common_name, sku)
+        animals!inner(name, sku)
       `)
       .not('animal_id', 'is', null)
       .order('quantity', { ascending: true })
@@ -52,7 +52,7 @@ export default function StockMinimoPage() {
     const mapped: AnimalStock[] = (data ?? []).map((r: any) => ({
       inventory_id: r.id,
       animal_id: r.animal_id,
-      name: r.animals?.common_name ?? '—',
+      name: r.animals?.name ?? '—',
       sku: r.animals?.sku ?? '—',
       quantity: r.quantity ?? 0,
       low_stock_threshold: r.low_stock_threshold ?? 5,

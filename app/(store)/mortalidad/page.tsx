@@ -56,7 +56,7 @@ export default function MortalidadPage() {
       .from('animal_mortality')
       .select(`
         id, recorded_at, quantity, reason,
-        animals!inner(common_name)
+        animals!inner(name)
       `)
       .gte('recorded_at', since)
       .order('recorded_at', { ascending: true })
@@ -68,7 +68,7 @@ export default function MortalidadPage() {
         recorded_at: r.recorded_at,
         quantity: r.quantity,
         reason: r.reason ?? 'desconocido',
-        animal_name: r.animals?.common_name ?? '—',
+        animal_name: r.animals?.name ?? '—',
       })))
     }
     setLoading(false)

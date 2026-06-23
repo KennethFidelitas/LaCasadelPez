@@ -40,18 +40,18 @@ export default function POSPage() {
     if (activeTab === 'animales') {
       const { data } = await supabase
         .from('animals')
-        .select('id, common_name, sku, price, stock_quantity')
+        .select('id, name, sku, price, stock_quantity')
         .eq('is_active', true)
-        .ilike('common_name', `%${search}%`)
+        .ilike('name', `%${search}%`)
         .gt('stock_quantity', 0)
-        .order('common_name')
+        .order('name')
         .limit(30)
 
       setCatalog(
         (data ?? []).map(a => ({
           id: a.id,
           type: 'animal' as const,
-          name: a.common_name,
+          name: a.name,
           sku: a.sku ?? '—',
           price: a.price ?? 0,
           stock: a.stock_quantity ?? 0,

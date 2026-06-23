@@ -32,9 +32,9 @@ export default async function RegistrarMuertePage() {
 
   const { data: animals } = await supabase
     .from('animals')
-    .select('id, common_name, sku')
+    .select('id, name, sku')
     .eq('is_active', true)
-    .order('common_name')
+    .order('name')
 
   const reasons = [
     { value: 'enfermedad',       label: 'Enfermedad' },
@@ -68,7 +68,7 @@ export default async function RegistrarMuertePage() {
               <option value="">Seleccione una especie</option>
               {(animals ?? []).map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.common_name} ({a.sku})
+                  {a.name} ({a.sku})
                 </option>
               ))}
             </select>
