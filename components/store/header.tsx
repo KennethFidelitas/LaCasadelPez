@@ -11,13 +11,19 @@ const navigation = [
   { name: 'Tienda', href: '/tienda' },
   { name: 'Peces', href: '/peces' },
   { name: 'Acuarios a Medida', href: '/armaTuPecera' },
-  { name: 'Administracion', href: '/dashboard' },
   { name: 'Nosotros', href: '/nosotros' },
 ]
 
-export function StoreHeader() {
+type StoreHeaderProps = {
+  showAdminLink?: boolean
+}
+
+export function StoreHeader({ showAdminLink = false }: StoreHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { totalItems, openCart } = useCart()
+  const navigationItems = showAdminLink
+    ? [...navigation, { name: 'Administracion', href: '/dashboard' }]
+    : navigation
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -35,7 +41,7 @@ export function StoreHeader() {
 
         {/* Desktop Navigation */}
         <div className="hidden lg:flex lg:gap-x-8">
-          {navigation.map((item) => (
+          {navigationItems.map((item) => (
             <Link
               key={item.name}
               href={item.href}
@@ -110,7 +116,7 @@ export function StoreHeader() {
             </div>
             <div className="mt-8 flow-root">
               <div className="flex flex-col gap-4">
-                {navigation.map((item) => (
+                {navigationItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}

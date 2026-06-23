@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, ShieldCheck, User } from 'lucide-react'
 import { LogoutButton } from '@/components/auth/logout-button'
@@ -5,6 +6,7 @@ import { Badge } from '@/components/ui/display/badge'
 import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
 import { formatDate } from '@/lib/format'
+import { createClient } from '@/lib/supabase/server'
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrador',
@@ -12,11 +14,30 @@ const roleLabels: Record<string, string> = {
   customer: 'Cliente',
 }
 
-export default function AccountPage() {
-  const displayName = 'Usuario Demo'
-  const email = 'demo@lacasadelpez.test'
-  const role = 'customer'
-  const createdAt = new Date()
+export default async function AccountPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/auth/login?redirect=/cuenta')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('first_name, last_name, email, role, created_at')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const displayName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+    user.user_metadata?.first_name ||
+    user.email ||
+    'Usuario'
+  const email = profile?.email || user.email || 'Sin correo'
+  const role = profile?.role || 'customer'
+  const createdAt = profile?.created_at ? new Date(profile.created_at) : new Date(user.created_at)
 
   return (
     <div className="bg-muted/20">
@@ -28,7 +49,7 @@ export default function AccountPage() {
             </Badge>
             <h1 className="text-3xl font-bold tracking-tight">Hola, {displayName}</h1>
             <p className="mt-2 text-muted-foreground">
-              Esta pantalla simula una sesion activa para presentar el flujo de autenticacion.
+              Esta pantalla muestra tu sesión activa y el rol con el que ingresaste.
             </p>
           </div>
           <LogoutButton />
@@ -38,7 +59,7 @@ export default function AccountPage() {
           <Card className="rounded-lg">
             <CardHeader>
               <CardTitle>Informacion de acceso</CardTitle>
-              <CardDescription>Datos de ejemplo para una demostracion sin conexion a Supabase.</CardDescription>
+              <CardDescription>Datos reales de tu cuenta en Supabase.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="flex items-center gap-3 rounded-lg border p-4">

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/forms/input'
 import { Label } from '@/components/ui/forms/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/navigation/tabs'
+import { createClient } from '@/lib/supabase/client'
 
 type AuthMode = 'login' | 'register'
 
@@ -22,6 +23,7 @@ export function AuthForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/cuenta'
+  const supabase = createClient()
 
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
@@ -47,21 +49,57 @@ export function AuthForm() {
       return
     }
 
-    if (mode === 'login') {
-      localStorage.setItem('demo-auth-email', email)
-      localStorage.setItem('demo-auth-name', 'Usuario Demo')
-      await new Promise((resolve) => setTimeout(resolve, 450))
-      router.replace(redirectTo)
-      router.refresh()
-      return
-    }
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
 
-    const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Usuario Demo'
-    localStorage.setItem('demo-auth-email', email)
-    localStorage.setItem('demo-auth-name', fullName)
-    await new Promise((resolve) => setTimeout(resolve, 450))
-    router.replace(redirectTo)
-    router.refresh()
+        if (error) {
+          setMessage({
+            type: 'error',
+            title: 'No se pudo iniciar sesión',
+            description: error.message,
+          })
+          return
+        }
+
+        router.replace(redirectTo)
+        router.refresh()
+        return
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
+        },
+      })
+
+      if (error) {
+        setMessage({
+          type: 'error',
+          title: 'No se pudo crear la cuenta',
+          description: error.message,
+        })
+        return
+      }
+
+      setMessage({
+        type: 'success',
+        title: 'Cuenta creada',
+        description:
+          'Tu cuenta fue creada. Si tu proyecto requiere confirmación por correo, revisa tu bandeja de entrada antes de iniciar sesión.',
+      })
+      setMode('login')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -76,15 +114,15 @@ export function AuthForm() {
           <CardTitle>{mode === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}</CardTitle>
           <CardDescription>
             {mode === 'login'
-              ? 'Demo de acceso para ver la pantalla de cuenta.'
-              : 'Demo de registro para simular el alta de un cliente.'}
+              ? 'Inicia sesión con tu cuenta real de Supabase.'
+              : 'Crea una cuenta real para clientes o equipo con permisos.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Alert className="mb-5">
-            <AlertTitle>Modo demostrativo</AlertTitle>
+            <AlertTitle>Acceso real</AlertTitle>
             <AlertDescription>
-              Este formulario no se conecta a Supabase. Solo simula el flujo para presentacion.
+              Este formulario usa autenticación real con Supabase.
             </AlertDescription>
           </Alert>
 

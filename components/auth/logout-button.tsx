@@ -4,18 +4,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/actions/button'
+import { createClient } from '@/lib/supabase/client'
 
 export function LogoutButton() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const supabase = createClient()
 
   async function handleLogout() {
     setIsLoading(true)
-    localStorage.removeItem('demo-auth-email')
-    localStorage.removeItem('demo-auth-name')
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    router.replace('/auth/login')
-    router.refresh()
+    try {
+      await supabase.auth.signOut()
+      router.replace('/auth/login')
+      router.refresh()
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

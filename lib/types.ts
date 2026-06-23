@@ -42,12 +42,13 @@ export interface Product {
 
 export interface Animal {
   id: string
-  common_name: string
+  name: string
   scientific_name: string | null
   slug: string
+  sku: string
   description: string | null
-  care_level: 'facil' | 'moderado' | 'avanzado'
-  water_type: 'dulce' | 'salada' | 'salobre'
+  care_level: 'facil' | 'moderado' | 'avanzado' | null
+  temperament: 'pacifico' | 'semi-agresivo' | 'agresivo' | null
   min_tank_size: number | null
   temperature_min: number | null
   temperature_max: number | null
@@ -55,13 +56,14 @@ export interface Animal {
   ph_max: number | null
   max_size: number | null
   diet: string | null
-  compatibility: string | null
+  compatibility: string[] | null
   origin: string | null
   lifespan: string | null
   images: string[]
   price: number
-  stock_quantity: number
+  cost: number | null
   is_active: boolean
+  is_featured: boolean
   created_at: string
   updated_at: string
 }
@@ -248,11 +250,36 @@ export interface PosSession {
   notes: string | null
 }
 
+export interface Inventory {
+  id: string
+  animal_id: string
+  quantity: number
+  location: string | null
+  low_stock_threshold: number
+}
+
+export interface AnimalMortality {
+  id: string
+  animal_id: string
+  quantity: number
+  reason: string
+  notes: string | null
+  recorded_by: string | null
+  recorded_at: string | null
+  created_at: string | null
+}
+
+export interface MuerteConAnimal extends AnimalMortality {
+  animals: {
+    name: string
+    scientific_name: string | null
+  } | null
+}
+
 // Utility types
 export type OrderStatus = Order['status']
 export type PaymentStatus = Order['payment_status']
 export type CareLevel = Animal['care_level']
-export type WaterType = Animal['water_type']
 export type UserRole = Profile['role']
 export type ProductionStatus = ProductionOrder['status']
 export type ProductionPaymentStatus = ProductionOrder['payment_status']
