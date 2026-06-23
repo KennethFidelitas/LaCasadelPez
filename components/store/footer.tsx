@@ -50,10 +50,18 @@ export function StoreFooter() {
               Expertos en acuarismo desde hace mas de 20 anos.
             </p>
             <div className="mt-6 space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Ejemplo de direccion</span>
-              </div>
+<div className="flex items-start gap-2">
+  <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+
+  <a
+    href="https://www.google.com/maps/place/Acuario+La+Casa+del+Pez/@9.9909666,-84.1494034,17z/data=!4m14!1m7!3m6!1s0x8fa0fa514f847539:0x1df03d824598f020!2sDirecci%C3%B3n+Regional+de+La+Fuerza+P%C3%BAblica,+Heredia!8m2!3d9.9909666!4d-84.1494034!16s%2Fg%2F1263nyywl!3m5!1s0x8fa0fa5366940905:0x43ce84e9e5e2f87c!8m2!3d9.9924201!4d-84.1489686!16s%2Fg%2F11b6hhr39h?entry=ttu&g_ep=EgoyMDI2MDYxNi4wIKXMDSoASAFQAw%3D%3D"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="hover:text-primary hover:underline"
+  >
+    La Aurora de Heredia, de la Fuerza Pública 300m norte, Heredia, Costa Rica, 40101
+  </a>
+</div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 shrink-0" />
                 <span>+00 000 000</span>
