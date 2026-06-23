@@ -111,7 +111,7 @@ export default async function RegistrarMuertePage() {
 
           <div className="flex justify-end gap-3 pt-2">
             <a
-              href="/inventario/mortalidad"
+              href="/mortalidad"
               className="rounded-md border px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
               Cancelar

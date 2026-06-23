@@ -176,7 +176,7 @@ export default function MortalidadPage() {
             <Fish className="h-10 w-10 text-slate-300" />
             <p className="text-slate-500 font-medium">Sin registros de mortalidad en este período</p>
             <Link
-              href="/inventario/mortalidad/registrar"
+              href="/mortalidad/registrar"
               className="mt-1 text-sm text-[#006f95] underline-offset-2 hover:underline"
             >
               Registrar primera muerte
