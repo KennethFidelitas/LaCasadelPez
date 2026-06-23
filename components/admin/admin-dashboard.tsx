@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   Activity,
@@ -22,6 +22,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { Button } from '@/components/ui/actions/button'
@@ -30,7 +31,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/display/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import { Input } from '@/components/ui/forms/input'
-import { formatPrice } from '@/lib/format'
+import { Label } from '@/components/ui/forms/label'
+import { Textarea } from '@/components/ui/forms/textarea'
+import { createCustomerContact } from '@/lib/customers/actions'
+import type { CustomerContactRecord } from '@/lib/customers/types'
+import { formatDateTime, formatPrice } from '@/lib/format'
+import { createPosSale } from '@/lib/pos/actions'
+import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
 
 type ModuleKey =
   | 'overview'
@@ -43,14 +50,7 @@ type ModuleKey =
   | 'reports'
   | 'settings'
 
-type PosProduct = {
-  id: string
-  name: string
-  sku: string
-  price: number
-  stock: number
-  category: string
-}
+type PosProduct = PosCatalogProduct
 
 type EmailTemplate = {
   id: string
@@ -76,29 +76,12 @@ type InventoryItem = {
   cost: number
 }
 
-type OrderItem = {
-  id: string
-  customer: string
-  channel: 'Online' | 'POS' | 'Telefono'
-  total: number
-  status: 'Pendiente' | 'Confirmado' | 'Preparacion' | 'Entregado'
-}
-
 type ProductionItem = {
   id: string
   client: string
   model: string
   progress: number
   stage: 'Cotizacion' | 'Corte' | 'Pegado' | 'Acabados' | 'Entrega'
-}
-
-type CustomerItem = {
-  id: string
-  name: string
-  segment: string
-  purchases: number
-  balance: number
-  status: 'Activo' | 'Seguimiento' | 'Credito'
 }
 
 const modules = [
@@ -117,27 +100,12 @@ const modules = [
   icon: React.ComponentType<{ className?: string }>
 }>
 
-const posCatalog: PosProduct[] = [
-  { id: 'p1', name: 'Acuario 80L', sku: 'ACU-080', price: 249000, stock: 4, category: 'Peceras' },
-  { id: 'p2', name: 'Filtro Canister 1200', sku: 'FIL-1200', price: 119000, stock: 7, category: 'Filtracion' },
-  { id: 'p3', name: 'Calentador 200W', sku: 'CAL-200', price: 26900, stock: 11, category: 'Temperatura' },
-  { id: 'p4', name: 'Sustrato Volcanico', sku: 'SUS-VOL', price: 18900, stock: 14, category: 'Decoracion' },
-  { id: 'p5', name: 'Guppy Cobra', sku: 'PZ-GUP', price: 4500, stock: 23, category: 'Peces' },
-]
-
 const initialInventory: InventoryItem[] = [
   { id: 'i1', name: 'Acuario 80L', sku: 'ACU-080', category: 'Peceras', stock: 4, min: 3, location: 'Bodega A', cost: 162000 },
   { id: 'i2', name: 'Filtro Canister 1200', sku: 'FIL-1200', category: 'Filtracion', stock: 7, min: 5, location: 'Bodega B', cost: 89000 },
   { id: 'i3', name: 'Termometro Digital', sku: 'TMP-DIG', category: 'Temperatura', stock: 2, min: 6, location: 'Mostrador', cost: 4500 },
   { id: 'i4', name: 'Betta Halfmoon', sku: 'PZ-BET', category: 'Peces', stock: 3, min: 4, location: 'Area viva', cost: 7000 },
   { id: 'i5', name: 'Alimento Premium', sku: 'ALI-PRM', category: 'Alimento', stock: 15, min: 8, location: 'Bodega C', cost: 8200 },
-]
-
-const initialOrders: OrderItem[] = [
-  { id: 'ORD-1042', customer: 'Valeria Mora', channel: 'Online', total: 184500, status: 'Pendiente' },
-  { id: 'ORD-1041', customer: 'Luis Chacon', channel: 'POS', total: 42900, status: 'Confirmado' },
-  { id: 'ORD-1039', customer: 'Marcos Solis', channel: 'Telefono', total: 298000, status: 'Preparacion' },
-  { id: 'ORD-1037', customer: 'Natalia Campos', channel: 'Online', total: 62500, status: 'Entregado' },
 ]
 
 const productionQueue: ProductionItem[] = [
@@ -147,19 +115,23 @@ const productionQueue: ProductionItem[] = [
   { id: 'PEC-223', client: 'Andrea Coto', model: 'Nano cube 45x45', progress: 10, stage: 'Cotizacion' },
 ]
 
-const customers: CustomerItem[] = [
-  { id: 'c1', name: 'Valeria Mora', segment: 'Frecuente', purchases: 12, balance: 0, status: 'Activo' },
-  { id: 'c2', name: 'Luis Chacon', segment: 'POS', purchases: 4, balance: 0, status: 'Activo' },
-  { id: 'c3', name: 'Carlos Araya', segment: 'Proyecto', purchases: 2, balance: 85000, status: 'Credito' },
-  { id: 'c4', name: 'Andrea Coto', segment: 'Seguimiento', purchases: 1, balance: 0, status: 'Seguimiento' },
-]
+interface AdminDashboardProps {
+  posCatalog: PosProduct[]
+  posCatalogError?: string | null
+  sales: PosSaleRecord[]
+  salesError?: string | null
+  salesSummary: PosSalesSummary
+  customers: CustomerContactRecord[]
+  customersError?: string | null
+}
 
-const reportCards = [
-  { title: 'Ventas del dia', value: 'CRC 1.294.300', progress: 74 },
-  { title: 'Meta semanal', value: 'CRC 4.980.000', progress: 61 },
-  { title: 'Inventario saludable', value: '78%', progress: 78 },
-  { title: 'Pedidos entregados', value: '34 / 41', progress: 83 },
-]
+const initialCustomerForm = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  notes: '',
+}
 
 const initialEmailTemplates: EmailTemplate[] = [
   {
@@ -180,8 +152,17 @@ const initialEmailTemplates: EmailTemplate[] = [
   },
 ]
 
-export function AdminDashboard() {
+export function AdminDashboard({
+  posCatalog,
+  posCatalogError = null,
+  sales,
+  salesError = null,
+  salesSummary,
+  customers,
+  customersError = null,
+}: AdminDashboardProps) {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
 
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('modulo')
@@ -225,6 +206,7 @@ export function AdminDashboard() {
         setInventoryItems(items)
       } catch (err) {
         console.error('Error al cargar inventario:', err)
+        setInventoryItems(initialInventory)
       } finally {
         setInventarioLoading(false)
       }
@@ -232,10 +214,6 @@ export function AdminDashboard() {
 
     cargarInventario()
   }, [])
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    { ...posCatalog[0], quantity: 1 },
-    { ...posCatalog[4], quantity: 3 },
-  ])
   const [discount, setDiscount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState<
   'efectivo' | 'tarjeta' | 'credito' | 'mixto'
@@ -250,7 +228,12 @@ export function AdminDashboard() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [inventarioLoading, setInventarioLoading] = useState(true)
   const [inventorySearch, setInventorySearch] = useState('')
-  const [orders, setOrders] = useState(initialOrders)
+  const [orders, setOrders] = useState(sales)
+  const [summary, setSummary] = useState(salesSummary)
+  const [customerRecords, setCustomerRecords] = useState(customers)
+  const [customerForm, setCustomerForm] = useState(initialCustomerForm)
+  const [isPending, startSavingSale] = useTransition()
+  const [isSavingCustomer, startSavingCustomer] = useTransition()
   const [emailTemplates, setEmailTemplates] = useState(initialEmailTemplates)
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialEmailTemplates[0].id)
 
@@ -315,10 +298,18 @@ export function AdminDashboard() {
     )
   }, [inventoryItems, inventorySearch])
 
+  const customerSuggestions = useMemo(
+    () => customerRecords.map((customer) => customer.fullName).filter(Boolean),
+    [customerRecords],
+  )
+
   function addToCart(product: PosProduct) {
+    if (product.stock <= 0) return
+
     setCartItems((current) => {
       const existing = current.find((item) => item.id === product.id)
       if (existing) {
+        if (existing.quantity >= product.stock) return current
         return current.map((item) =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
         )
@@ -331,10 +322,73 @@ export function AdminDashboard() {
     setCartItems((current) =>
       current
         .map((item) =>
-          item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item,
+          item.id === id
+            ? {
+                ...item,
+                quantity: Math.max(0, Math.min(item.stock, item.quantity + delta)),
+              }
+            : item,
         )
         .filter((item) => item.quantity > 0),
     )
+  }
+
+  function handleConfirmSale() {
+    if (!cashSessionOpen) {
+      toast.error('Debes tener la caja abierta para completar la venta.')
+      return
+    }
+
+    if (cartItems.length === 0) {
+      toast.error('Agrega al menos un producto antes de confirmar la venta.')
+      return
+    }
+
+    startSavingSale(() => {
+      void (async () => {
+        try {
+          const sale = await createPosSale({
+            items: cartItems,
+            discount,
+            paymentMethod,
+          })
+
+          setOrders((current) => [
+            {
+              id: sale.orderId,
+              orderNumber: sale.orderNumber,
+              customer: 'Cliente de mostrador',
+              channel: 'POS',
+              total: sale.total,
+              status: 'Confirmado',
+              paymentStatus: 'Pagado',
+              paymentMethod,
+              createdAt: new Date().toISOString(),
+              transactionNumber: sale.transactionNumber,
+            },
+            ...current,
+          ])
+          setSummary((current) => {
+            const transactionsToday = current.transactionsToday + 1
+            const totalSalesToday = current.totalSalesToday + sale.total
+
+            return {
+              ...current,
+              totalSalesToday,
+              transactionsToday,
+              averageTicketToday: totalSalesToday / transactionsToday,
+              posSalesToday: current.posSalesToday + 1,
+            }
+          })
+
+          setCartItems([])
+          setDiscount(0)
+          toast.success(`Venta ${sale.transactionNumber} registrada correctamente`)
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'No se pudo registrar la venta')
+        }
+      })()
+    })
   }
 
   function adjustInventory(id: string, delta: number) {
@@ -345,15 +399,23 @@ export function AdminDashboard() {
     )
   }
 
-  function advanceOrder(id: string) {
-    const flow: OrderItem['status'][] = ['Pendiente', 'Confirmado', 'Preparacion', 'Entregado']
-    setOrders((current) =>
-      current.map((order) => {
-        if (order.id !== id) return order
-        const nextIndex = Math.min(flow.indexOf(order.status) + 1, flow.length - 1)
-        return { ...order, status: flow[nextIndex] }
-      }),
-    )
+  function handleCustomerFieldChange(field: keyof typeof initialCustomerForm, value: string) {
+    setCustomerForm((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleCreateCustomer() {
+    startSavingCustomer(() => {
+      void (async () => {
+        try {
+          const customer = await createCustomerContact(customerForm)
+          setCustomerRecords((current) => [customer, ...current])
+          setCustomerForm(initialCustomerForm)
+          toast.success(`Cliente ${customer.fullName} registrado correctamente`)
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'No se pudo registrar el cliente')
+        }
+      })()
+    })
   }
 
 function updateEmailTemplate(
@@ -507,8 +569,8 @@ async function sendTestEmail() {
                   <Link href="/tienda">Ver tienda</Link>
                 </Button>              
                 <Button asChild>
-                  <Link href="/auth/login">Acceso demo</Link>
-                </Button>              
+                  <Link href="/auth/login">Acceso</Link>
+                </Button>
               </div>
             </div>
           </section>
@@ -517,10 +579,30 @@ async function sendTestEmail() {
             {activeModule === 'overview' && (
               <>
                 <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <OverviewCard title="Ventas hoy" value="CRC 1.294.300" icon={Wallet} detail="13 transacciones registradas" />
-                  <OverviewCard title="Pedidos activos" value="12" icon={Receipt} detail="Online, POS y telefono" />
-                  <OverviewCard title="Stock critico" value="5" icon={Bell} detail="Productos por debajo del minimo" />
-                  <OverviewCard title="Produccion" value="4" icon={Factory} detail="Peceras en proceso" />
+                  <OverviewCard
+                    title="Ventas hoy"
+                    value={formatPrice(summary.totalSalesToday)}
+                    icon={Wallet}
+                    detail={`${summary.transactionsToday} transacciones pagadas hoy`}
+                  />
+                  <OverviewCard
+                    title="Pendientes"
+                    value={String(summary.pendingOrders)}
+                    icon={Receipt}
+                    detail="Pedidos que requieren seguimiento operativo"
+                  />
+                  <OverviewCard
+                    title="POS hoy"
+                    value={String(summary.posSalesToday)}
+                    icon={CreditCard}
+                    detail="Ventas registradas desde mostrador"
+                  />
+                  <OverviewCard
+                    title="Online hoy"
+                    value={String(summary.onlineSalesToday)}
+                    icon={Store}
+                    detail="Ventas registradas desde e-commerce"
+                  />
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -564,8 +646,14 @@ async function sendTestEmail() {
                     </CardHeader>
                     <CardContent className="grid gap-3">
                       <AlertRow title="Caja principal abierta" detail="Cajero: Daniela Vargas · 08:02 a.m." />
-                      <AlertRow title="2 apartados vencen mañana" detail="Requieren contacto con el cliente." />
-                      <AlertRow title="5 articulos con stock critico" detail="Prioridad alta en mostrador y peces." />
+                      <AlertRow
+                        title={`${summary.pendingOrders} pedidos pendientes`}
+                        detail="Revisar pagos, inventario y tiempos de entrega."
+                      />
+                      <AlertRow
+                        title={`${summary.transactionsToday} transacciones confirmadas hoy`}
+                        detail="Incluye ventas POS y online con pago registrado."
+                      />
                       <AlertRow title="1 pecera lista para entrega" detail="Proyecto PEC-222 en acabados finales." />
                     </CardContent>
                   </Card>
@@ -581,26 +669,37 @@ async function sendTestEmail() {
                     <CardDescription>Agregar productos al carrito y simular una venta en mostrador.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-3">
-                    {posCatalog.map((product) => (
-                      <div key={product.id} className="flex items-center justify-between rounded-lg border p-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground">{product.name}</p>
-                            <Badge variant="outline">{product.category}</Badge>
+                      {posCatalogError && (
+                        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                          No se pudo cargar el catálogo POS desde Supabase. Detalle: {posCatalogError}
+                        </div>
+                      )}
+                      {posCatalog.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                          No hay productos activos con inventario disponible para el POS.
+                        </div>
+                      ) : (
+                        posCatalog.map((product) => (
+                          <div key={product.id} className="flex items-center justify-between rounded-lg border p-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-foreground">{product.name}</p>
+                                <Badge variant="outline">{product.category}</Badge>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {product.sku} · Stock {product.stock}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <p className="font-semibold">{formatPrice(product.price)}</p>
+                              <Button size="sm" onClick={() => addToCart(product)} disabled={product.stock <= 0}>
+                                <Plus className="h-4 w-4" />
+                                Agregar
+                              </Button>
+                            </div>
                           </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {product.sku} · Stock {product.stock}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <p className="font-semibold">{formatPrice(product.price)}</p>
-                          <Button size="sm" onClick={() => addToCart(product)}>
-                            <Plus className="h-4 w-4" />
-                            Agregar
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                        ))
+                      )}
                   </CardContent>
                 </Card>
 
@@ -654,25 +753,36 @@ async function sendTestEmail() {
                         ))}
                       </div>
 
-                      {cartItems.map((item) => (
-                        <div key={item.id} className="rounded-lg border p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-foreground">{item.name}</p>
-                              <p className="text-sm text-muted-foreground">{formatPrice(item.price)} c/u</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button size="icon-sm" variant="outline" onClick={() => updateCartQuantity(item.id, -1)}>
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                              <Button size="icon-sm" variant="outline" onClick={() => updateCartQuantity(item.id, 1)}>
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                      {cartItems.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                          El carrito POS está vacío.
+                        </div>
+                      ) : (
+                        cartItems.map((item) => (
+                          <div key={item.id} className="rounded-lg border p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-foreground">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">{formatPrice(item.price)} c/u</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button size="icon-sm" variant="outline" onClick={() => updateCartQuantity(item.id, -1)}>
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                                <Button
+                                  size="icon-sm"
+                                  variant="outline"
+                                  onClick={() => updateCartQuantity(item.id, 1)}
+                                  disabled={item.quantity >= item.stock}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
 
                     <div className="rounded-lg border p-4">
@@ -712,6 +822,13 @@ async function sendTestEmail() {
                       </div>
                     </div>
 
+                    <Button
+                      className="w-full"
+                      onClick={handleConfirmSale}
+                      disabled={isPending || cartItems.length === 0 || !cashSessionOpen}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      {isPending ? 'Guardando venta...' : 'Confirmar venta'}
                     <div className="rounded-lg border p-4">
                       <p className="font-medium text-foreground">Detalle del pago</p>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -778,101 +895,102 @@ async function sendTestEmail() {
                       </div>
                     </div>
 
-<div className="rounded-lg border p-4">
-  <div className="flex items-center justify-between gap-3">
-    <div>
-      <p className="font-medium text-foreground">Gestión de caja</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Controla apertura, efectivo esperado y cierre de caja.
-      </p>
-    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground">Gestión de caja</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Controla apertura, efectivo esperado y cierre de caja.
+                          </p>
+                        </div>
 
-    <Badge variant={cashSessionOpen ? 'secondary' : 'outline'}>
-      {cashSessionOpen ? 'Caja abierta' : 'Caja cerrada'}
-    </Badge>
-  </div>
+                        <Badge variant={cashSessionOpen ? 'secondary' : 'outline'}>
+                          {cashSessionOpen ? 'Caja abierta' : 'Caja cerrada'}
+                        </Badge>
+                      </div>
 
-  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-    <div>
-      <label className="text-sm text-muted-foreground">
-        Monto inicial
-      </label>
-      <input
-        type="number"
-        min="0"
-        value={openingCash}
-        disabled={cashSessionOpen}
-        onChange={(event) => setOpeningCash(Number(event.target.value))}
-        className="mt-1 w-full rounded-md border px-3 py-2 text-sm disabled:bg-muted"
-        placeholder="Ej: 120000"
-      />
-    </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Monto inicial
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={openingCash}
+                            disabled={cashSessionOpen}
+                            onChange={(event) => setOpeningCash(Number(event.target.value))}
+                            className="mt-1 w-full rounded-md border px-3 py-2 text-sm disabled:bg-muted"
+                            placeholder="Ej: 120000"
+                          />
+                        </div>
 
-    <div>
-      <p className="text-sm text-muted-foreground">Ventas en efectivo</p>
-      <p className="mt-2 font-semibold">
-        {formatPrice(cashSalesAmount)}
-      </p>
-    </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Ventas en efectivo</p>
+                          <p className="mt-2 font-semibold">
+                            {formatPrice(cashSalesAmount)}
+                          </p>
+                        </div>
 
-    <div>
-      <p className="text-sm text-muted-foreground">Efectivo esperado</p>
-      <p className="mt-2 font-semibold">
-        {formatPrice(expectedCash)}
-      </p>
-    </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Efectivo esperado</p>
+                          <p className="mt-2 font-semibold">
+                            {formatPrice(expectedCash)}
+                          </p>
+                        </div>
 
-    <div>
-      <label className="text-sm text-muted-foreground">
-        Efectivo contado al cierre
-      </label>
-      <input
-        type="number"
-        min="0"
-        value={closingCash}
-        onChange={(event) => setClosingCash(Number(event.target.value))}
-        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-        placeholder="Ej: 125000"
-      />
-    </div>
-  </div>
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Efectivo contado al cierre
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={closingCash}
+                            onChange={(event) => setClosingCash(Number(event.target.value))}
+                            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                            placeholder="Ej: 125000"
+                          />
+                        </div>
+                      </div>
 
-  <div className="mt-4 rounded-md bg-muted p-3">
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">Diferencia de caja</span>
-      <span
-        className={
-          cashDifference === 0
-            ? 'font-semibold text-foreground'
-            : cashDifference > 0
-              ? 'font-semibold text-emerald-600'
-              : 'font-semibold text-red-600'
-        }
-      >
-        {formatPrice(cashDifference)}
-      </span>
-    </div>
-  </div>
+                      <div className="mt-4 rounded-md bg-muted p-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Diferencia de caja</span>
+                          <span
+                            className={
+                              cashDifference === 0
+                                ? 'font-semibold text-foreground'
+                                : cashDifference > 0
+                                  ? 'font-semibold text-emerald-600'
+                                  : 'font-semibold text-red-600'
+                            }
+                          >
+                            {formatPrice(cashDifference)}
+                          </span>
+                        </div>
+                      </div>
 
-  <div className="mt-4">
-    <label className="text-sm text-muted-foreground">
-      Observaciones
-    </label>
-    <textarea
-      value={cashNotes}
-      onChange={(event) => setCashNotes(event.target.value)}
-      className="mt-1 min-h-20 w-full rounded-md border px-3 py-2 text-sm"
-      placeholder="Ej: Diferencia por cambio pendiente, billete dañado, arqueo correcto..."
-    />
-  </div>
-</div>
+                      <div className="mt-4">
+                        <label className="text-sm text-muted-foreground">
+                          Observaciones
+                        </label>
+                        <textarea
+                          value={cashNotes}
+                          onChange={(event) => setCashNotes(event.target.value)}
+                          className="mt-1 min-h-20 w-full rounded-md border px-3 py-2 text-sm"
+                          placeholder="Ej: Diferencia por cambio pendiente, billete dañado, arqueo correcto..."
+                        />
+                      </div>
+                    </div>
 
                     <Button
                       className="w-full"
-                      disabled={!cashSessionOpen || cartItems.length === 0}
+                      onClick={handleConfirmSale}
+                      disabled={isPending || !cashSessionOpen || cartItems.length === 0}
                     >
                       <CreditCard className="h-4 w-4" />
-                      Confirmar venta
+                      {isPending ? 'Guardando venta...' : 'Confirmar venta'}
                     </Button>
                     {!cashSessionOpen && (
                       <p className="text-center text-xs text-muted-foreground">
@@ -1014,63 +1132,92 @@ async function sendTestEmail() {
               <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
                 <Card className="rounded-lg">
                   <CardHeader>
-                    <CardTitle>Bandeja de pedidos</CardTitle>
-                    <CardDescription>Seguimiento de pedidos del sistema y actualizacion de estados.</CardDescription>
+                    <CardTitle>Historial de ventas</CardTitle>
+                    <CardDescription>Transacciones reales registradas en el sistema por canal y fecha.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Pedido</TableHead>
-                          <TableHead>Cliente</TableHead>
-                          <TableHead>Canal</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Accion</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {orders.map((order) => (
-                          <TableRow key={order.id}>
-                            <TableCell className="font-medium">{order.id}</TableCell>
-                            <TableCell>{order.customer}</TableCell>
-                            <TableCell>{order.channel}</TableCell>
-                            <TableCell>{formatPrice(order.total)}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  order.status === 'Entregado'
-                                    ? 'secondary'
-                                    : order.status === 'Pendiente'
-                                      ? 'destructive'
-                                      : 'default'
-                                }
-                              >
-                                {order.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline" onClick={() => advanceOrder(order.id)}>
-                                Avanzar
-                              </Button>
-                            </TableCell>
+                    {salesError && (
+                      <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                        No se pudo cargar el historial de ventas. Detalle: {salesError}
+                      </div>
+                    )}
+                    {orders.length === 0 ? (
+                      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                        Aún no hay ventas registradas para mostrar.
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Pedido</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Canal</TableHead>
+                            <TableHead>Pago</TableHead>
+                            <TableHead>Total</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Fecha</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {orders.map((order) => (
+                            <TableRow key={order.id}>
+                              <TableCell>
+                                <div className="font-medium">{order.orderNumber}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {order.transactionNumber ? `Tx ${order.transactionNumber}` : 'Sin transacción POS'}
+                                </div>
+                              </TableCell>
+                              <TableCell>{order.customer}</TableCell>
+                              <TableCell>{order.channel}</TableCell>
+                              <TableCell>{order.paymentMethod}</TableCell>
+                              <TableCell>{formatPrice(order.total)}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  <Badge
+                                    variant={
+                                      order.status === 'Cancelado'
+                                        ? 'destructive'
+                                        : order.status === 'Pendiente'
+                                          ? 'outline'
+                                          : 'default'
+                                    }
+                                  >
+                                    {order.status}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">{order.paymentStatus}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{formatDateTime(order.createdAt)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
                   </CardContent>
                 </Card>
 
                 <Card className="rounded-lg">
                   <CardHeader>
-                    <CardTitle>Vista operacional</CardTitle>
-                    <CardDescription>Lo que la administracion ve para priorizar despacho.</CardDescription>
+                    <CardTitle>Analisis rapido</CardTitle>
+                    <CardDescription>Resumen inmediato para revisar transacciones y comportamiento del dia.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-3">
-                    <AlertRow title="2 pedidos pendientes" detail="Revisar pago y confirmar inventario." />
-                    <AlertRow title="1 pedido por telefono" detail="Requiere validacion manual y recibo." />
-                    <AlertRow title="3 pedidos en preparacion" detail="Filtracion, termometros y peces vivos." />
-                    <AlertRow title="Pedidos entregados" detail="Listos para historico y reporte del dia." />
+                    <AlertRow
+                      title={`Ticket promedio hoy: ${formatPrice(summary.averageTicketToday)}`}
+                      detail="Promedio calculado sobre las transacciones pagadas del día."
+                    />
+                    <AlertRow
+                      title={`Ventas POS hoy: ${summary.posSalesToday}`}
+                      detail="Mide la actividad de mostrador frente al resto de canales."
+                    />
+                    <AlertRow
+                      title={`Ventas online hoy: ${summary.onlineSalesToday}`}
+                      detail="Sirve para comparar el aporte del e-commerce en tiempo real."
+                    />
+                    <AlertRow
+                      title={`Pendientes por revisar: ${summary.pendingOrders}`}
+                      detail="Pedidos que todavía no están resueltos o entregados."
+                    />
                   </CardContent>
                 </Card>
               </section>
@@ -1116,43 +1263,103 @@ async function sendTestEmail() {
                 <Card className="rounded-lg">
                   <CardHeader>
                     <CardTitle>Clientes</CardTitle>
-                    <CardDescription>Segmentacion, compras y creditos para seguimiento comercial.</CardDescription>
+                    <CardDescription>Base de datos real de clientes registrados desde mostrador o panel interno.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-3">
-                    {customers.map((customer) => (
-                      <div key={customer.id} className="flex items-center justify-between rounded-lg border p-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground">{customer.name}</p>
-                            <Badge variant="outline">{customer.segment}</Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {customer.purchases} compras · saldo {formatPrice(customer.balance)}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            customer.status === 'Activo'
-                              ? 'secondary'
-                              : customer.status === 'Credito'
-                                ? 'default'
-                                : 'outline'
-                          }
-                        >
-                          {customer.status}
-                        </Badge>
+                    {customersError && (
+                      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                        No se pudo cargar la base de clientes. Detalle: {customersError}
                       </div>
-                    ))}
+                    )}
+                    {customerRecords.length === 0 ? (
+                      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                        Aún no hay clientes registrados en la base interna.
+                      </div>
+                    ) : (
+                      customerRecords.map((customer) => (
+                        <div key={customer.id} className="rounded-lg border p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-foreground">{customer.fullName}</p>
+                            <Badge variant="secondary">Cliente</Badge>
+                          </div>
+                          <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
+                            <p>{customer.email || 'Sin correo registrado'}</p>
+                            <p>{customer.phone || 'Sin teléfono registrado'}</p>
+                            <p>Creado: {formatDateTime(customer.createdAt)}</p>
+                            {customer.notes && <p>Nota: {customer.notes}</p>}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
 
                 <Card className="rounded-lg">
                   <CardHeader>
-                    <CardTitle>Acciones comerciales</CardTitle>
-                    <CardDescription>Frontend para fidelizacion, creditos y apartados.</CardDescription>
+                    <CardTitle>Registrar nuevo cliente</CardTitle>
+                    <CardDescription>Captura datos personales y de contacto para futuras ventas y seguimiento.</CardDescription>
                   </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <ActionRow icon={Users} title="Crear ficha de cliente" detail="Registro rapido desde tienda o POS." />
+                  <CardContent className="grid gap-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="customer-first-name">Nombre</Label>
+                        <Input
+                          id="customer-first-name"
+                          value={customerForm.firstName}
+                          onChange={(event) => handleCustomerFieldChange('firstName', event.target.value)}
+                          placeholder="Adrian"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="customer-last-name">Apellido</Label>
+                        <Input
+                          id="customer-last-name"
+                          value={customerForm.lastName}
+                          onChange={(event) => handleCustomerFieldChange('lastName', event.target.value)}
+                          placeholder="Avillalobos"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="customer-email">Correo</Label>
+                        <Input
+                          id="customer-email"
+                          type="email"
+                          value={customerForm.email}
+                          onChange={(event) => handleCustomerFieldChange('email', event.target.value)}
+                          placeholder="cliente@ejemplo.com"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="customer-phone">Teléfono</Label>
+                        <Input
+                          id="customer-phone"
+                          value={customerForm.phone}
+                          onChange={(event) => handleCustomerFieldChange('phone', event.target.value)}
+                          placeholder="8888-8888"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="customer-notes">Notas</Label>
+                      <Textarea
+                        id="customer-notes"
+                        value={customerForm.notes}
+                        onChange={(event) => handleCustomerFieldChange('notes', event.target.value)}
+                        placeholder="Preferencias, observaciones o contexto comercial..."
+                      />
+                    </div>
+                    {customerSuggestions.length > 0 && (
+                      <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                        Clientes registrados: {customerSuggestions.slice(0, 4).join(', ')}
+                      </div>
+                    )}
+                    <Button onClick={handleCreateCustomer} disabled={isSavingCustomer}>
+                      <Users className="h-4 w-4" />
+                      {isSavingCustomer ? 'Guardando cliente...' : 'Guardar ficha de cliente'}
+                    </Button>
+                    <ActionRow icon={Users} title="Crear ficha de cliente" detail="Registro real desde el panel del vendedor." />
                     <Link href="/credito">
                       <ActionRow
                         icon={Wallet}
@@ -1174,17 +1381,26 @@ async function sendTestEmail() {
             {activeModule === 'reports' && (
               <section className="grid gap-6">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {reportCards.map((card) => (
-                    <Card key={card.title} className="rounded-lg">
-                      <CardHeader>
-                        <CardDescription>{card.title}</CardDescription>
-                        <CardTitle className="text-2xl">{card.value}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Progress value={card.progress} />
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <MetricCard
+                    title="Ventas del día"
+                    value={formatPrice(summary.totalSalesToday)}
+                    detail={`${summary.transactionsToday} transacciones pagadas`}
+                  />
+                  <MetricCard
+                    title="Ticket promedio"
+                    value={formatPrice(summary.averageTicketToday)}
+                    detail="Promedio de compra del día"
+                  />
+                  <MetricCard
+                    title="Canal POS"
+                    value={String(summary.posSalesToday)}
+                    detail="Ventas en mostrador hoy"
+                  />
+                  <MetricCard
+                    title="Canal online"
+                    value={String(summary.onlineSalesToday)}
+                    detail="Ventas e-commerce hoy"
+                  />
                 </div>
 
                 <Card className="rounded-lg">
@@ -1193,10 +1409,10 @@ async function sendTestEmail() {
                     <CardDescription>Vista resumida para toma de decisiones administrativas.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-3 md:grid-cols-2">
-                    <ReportLine title="Ventas POS vs online" value="58% / 42%" />
-                    <ReportLine title="Metodos de pago" value="Efectivo 39%, Tarjeta 44%, Mixto 17%" />
-                    <ReportLine title="Rotacion de inventario" value="Filtracion y peces vivos lideran el mes" />
-                    <ReportLine title="Cierres de caja" value="Sin diferencias mayores en los ultimos 5 dias" />
+                    <ReportLine title="Ventas POS vs online" value={`${summary.posSalesToday} / ${summary.onlineSalesToday}`} />
+                    <ReportLine title="Pendientes" value={`${summary.pendingOrders} pedidos requieren seguimiento`} />
+                    <ReportLine title="Ticket promedio" value={formatPrice(summary.averageTicketToday)} />
+                    <ReportLine title="Ventas confirmadas hoy" value={`${summary.transactionsToday} operaciones registradas`} />
                   </CardContent>
                 </Card>
               </section>
@@ -1511,6 +1727,20 @@ function OverviewCard({
         <div className="rounded-lg bg-primary/10 p-2 text-primary">
           <Icon className="h-5 w-5" />
         </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MetricCard({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader>
+        <CardDescription>{title}</CardDescription>
+        <CardTitle className="text-2xl">{value}</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">{detail}</p>
