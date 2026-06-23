@@ -18,6 +18,14 @@ const careLevelColors = {
   avanzado: 'bg-red-100 text-red-700',
 }
 
+function getAnimalDisplayName(animal: Animal) {
+  return animal.common_name?.trim() || animal.scientific_name?.trim() || 'Pez tropical'
+}
+
+function getAnimalImageAlt(animal: Animal) {
+  return `Foto de ${getAnimalDisplayName(animal)}`
+}
+
 export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
   const { addItem, openCart } = useCart()
 
@@ -25,7 +33,7 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
     addItem({
       id: animal.id,
       type: 'animal',
-      name: animal.common_name,
+      name: getAnimalDisplayName(animal),
       price: animal.price,
       image: animal.images?.[0],
       stock: animal.stock_quantity,
@@ -52,7 +60,7 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
             {animal.images?.[0] ? (
               <Image
                 src={animal.images[0]}
-                alt={animal.common_name}
+                alt={getAnimalImageAlt(animal)}
                 fill
                 className="object-cover transition-transform group-hover:scale-105"
               />
@@ -70,7 +78,7 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
           <div className="flex flex-1 flex-col p-4">
             <Link href={`/peces/${animal.slug}`}>
               <h3 className="font-medium text-foreground line-clamp-1 group-hover:text-primary">
-                {animal.common_name}
+                {getAnimalDisplayName(animal)}
               </h3>
             </Link>
             {animal.scientific_name && (
