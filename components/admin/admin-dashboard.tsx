@@ -822,13 +822,6 @@ async function sendTestEmail() {
                       </div>
                     </div>
 
-                    <Button
-                      className="w-full"
-                      onClick={handleConfirmSale}
-                      disabled={isPending || cartItems.length === 0 || !cashSessionOpen}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      {isPending ? 'Guardando venta...' : 'Confirmar venta'}
                     <div className="rounded-lg border p-4">
                       <p className="font-medium text-foreground">Detalle del pago</p>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -1026,6 +1019,15 @@ async function sendTestEmail() {
                         <Link href="/inventario/consultar-animales">
                           Consultar Inventario
                         </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/mortalidad">Gráficos mortalidad</Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/stock-minimo">Stock mínimo</Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/reporte-mortalidad">Reporte mortalidad</Link>
                       </Button>
                       <Button variant="outline" asChild>
                         <Link href="/inventario/imprimir-reporte">
@@ -1445,6 +1447,13 @@ async function sendTestEmail() {
                       title="Permisos"
                       detail="Administrador, caja, inventario y produccion."
                     />
+                    <div className="pt-2">
+                      <Button variant="outline" asChild>
+                        <Link href="/admin/marketing">
+                          Marketing Digital
+                        </Link>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
 

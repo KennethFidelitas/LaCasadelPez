@@ -1,12 +1,12 @@
 import { AdminDashboard } from '@/components/admin/admin-dashboard'
-import { requireStaffUser } from '@/lib/auth/session'
+import { requireAdminUser } from '@/lib/auth/session'
 import { getCustomerContacts } from '@/lib/customers/data'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 import { getPosCatalog, getSalesDashboardData } from '@/lib/pos/data'
 import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
 
 export default async function AdminPage() {
-  await requireStaffUser('/admin')
+  await requireAdminUser('/admin')
 
   let posCatalog: PosCatalogProduct[] = []
   let posCatalogError: string | null = null

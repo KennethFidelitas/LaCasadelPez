@@ -38,3 +38,17 @@ export async function requireStaffUser(redirectTo: string) {
     profile,
   }
 }
+
+export async function requireAdminUser(redirectTo: string) {
+  const { supabase, user, profile } = await requireStaffUser(redirectTo)
+
+  if (profile.role !== 'admin') {
+    redirect('/cuenta')
+  }
+
+  return {
+    supabase,
+    user,
+    profile,
+  }
+}
