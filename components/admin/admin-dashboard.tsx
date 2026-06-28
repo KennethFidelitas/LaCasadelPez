@@ -12,6 +12,7 @@ import {
   FileText,
   LayoutDashboard,
   Minus,
+  Pencil,
   Plus,
   Printer,
   Receipt,
@@ -1011,11 +1012,6 @@ async function sendTestEmail() {
                         </Link>
                       </Button>
                       <Button variant="outline" asChild>
-                        <Link href="/inventario/modificar-lote">
-                          Modificar Lote
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
                         <Link href="/inventario/consultar-animales">
                           Consultar Inventario
                         </Link>
@@ -1045,16 +1041,6 @@ async function sendTestEmail() {
                           Registrar Baja
                         </Link>
                       </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/historial-muertes">
-                          Historial de Bajas
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/estadisticas-mortalidad">
-                          Estadísticas
-                        </Link>
-                      </Button>
                     </div>
                   </div>                  
                   </CardHeader>
@@ -1081,18 +1067,19 @@ async function sendTestEmail() {
                           <TableHead>Minimo</TableHead>
                           <TableHead>Costo</TableHead>
                           <TableHead>Ajuste</TableHead>
+                          <TableHead>Editar</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {inventarioLoading ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                            <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                               Cargando inventario…
                             </TableCell>
                           </TableRow>
                         ) : filteredInventory.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                            <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                               {inventorySearch ? 'Sin resultados para la búsqueda.' : 'No hay animales en inventario.'}
                             </TableCell>
                           </TableRow>
@@ -1120,6 +1107,13 @@ async function sendTestEmail() {
                                   <Plus className="h-4 w-4" />
                                 </Button>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button size="icon-sm" variant="outline" asChild>
+                                <Link href={`/inventario/modificar-lote/${item.id}`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
