@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Fish, MapPin, Phone, Mail, Clock } from 'lucide-react'
+import { SocialLinks } from '@/components/store/social-links'
 
 const footerLinks = {
   tienda: [
@@ -78,6 +79,15 @@ export function StoreFooter() {
                   <p>Domingo: 11:00 - 15:00</p>
                 </div>
               </div>
+            </div>
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="mb-3 text-sm text-muted-foreground">Síguenos</p>
+              <SocialLinks
+                facebook="https://www.facebook.com/MarkosBoganN"
+                instagram="https://instagram.com/lacasadelpez"
+                tiktok="https://www.tiktok.com/@markosbogante"
+                whatsapp="https://wa.me/50688888888"
+              />
             </div>
           </div>
 
