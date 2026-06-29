@@ -34,7 +34,7 @@ export default async function StoreLayout({
   return (
     <CartProvider>
       <div className="flex min-h-screen flex-col">
-        <StoreHeader showAdminLink={showAdminLink} />
+        <StoreHeader showAdminLink={showAdminLink} isLoggedIn={!!user} />
         <main className="flex-1">{children}</main>
         <StoreFooter />
         <CartDrawer />

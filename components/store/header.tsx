@@ -16,9 +16,10 @@ const navigation = [
 
 type StoreHeaderProps = {
   showAdminLink?: boolean
+  isLoggedIn?: boolean
 }
 
-export function StoreHeader({ showAdminLink = false }: StoreHeaderProps) {
+export function StoreHeader({ showAdminLink = false, isLoggedIn = false }: StoreHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { totalItems, openCart } = useCart()
   const navigationItems = showAdminLink
@@ -59,7 +60,7 @@ export function StoreHeader({ showAdminLink = false }: StoreHeaderProps) {
             <span className="sr-only">Buscar</span>
           </Button>
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/auth/login">
+            <Link href={isLoggedIn ? '/cuenta' : '/auth/login'}>
               <User className="h-5 w-5" />
               <span className="sr-only">Mi cuenta</span>
             </Link>
@@ -129,12 +130,12 @@ export function StoreHeader({ showAdminLink = false }: StoreHeaderProps) {
               </div>
               <div className="mt-8 border-t border-border pt-6">
                 <Link
-                  href="/auth/login"
+                  href={isLoggedIn ? '/cuenta' : '/auth/login'}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-foreground transition-colors hover:bg-muted"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <User className="h-5 w-5" />
-                  Mi Cuenta
+                  {isLoggedIn ? 'Mi Cuenta' : 'Iniciar sesión'}
                 </Link>
               </div>
             </div>

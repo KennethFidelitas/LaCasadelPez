@@ -102,6 +102,8 @@ export function FormularioMuerte({ animales }: FormularioMuerteProps) {
     // Limpiar formulario para registrar otra baja
     reset({
       animal_id: '',
+      quantity: '' as unknown as number,
+      reason: undefined,
       recorded_at: new Date().toLocaleDateString('en-CA'),
       notes: '',
     })
@@ -215,7 +217,6 @@ export function FormularioMuerte({ animales }: FormularioMuerteProps) {
             <Input
               id="quantity"
               type="number"
-              min="1"
               max={stockActual ?? undefined}
               placeholder="Ej: 3"
               {...register('quantity')}

@@ -34,17 +34,21 @@ export type RegistroEntradaValues = z.infer<typeof registroEntradaSchema>
 
 export const CAUSAS_MUERTE = [
   'enfermedad',
-  'parametros_agua',
-  'traslado',
-  'causa_desconocida',
+  'transporte',
+  'pelea',
+  'condiciones_agua',
+  'edad',
+  'desconocido',
   'otro',
 ] as const
 
 export const CAUSA_MUERTE_LABELS: Record<typeof CAUSAS_MUERTE[number], string> = {
   enfermedad: 'Enfermedad',
-  parametros_agua: 'Parámetros del agua',
-  traslado: 'Traslado',
-  causa_desconocida: 'Causa desconocida',
+  transporte: 'Transporte / traslado',
+  pelea: 'Pelea entre animales',
+  condiciones_agua: 'Condiciones del agua',
+  edad: 'Muerte por edad',
+  desconocido: 'Causa desconocida',
   otro: 'Otro',
 }
 
