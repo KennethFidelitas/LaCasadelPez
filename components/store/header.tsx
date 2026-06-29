@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Fish, ShoppingCart, Menu, X, Search, User } from 'lucide-react'
 import { Button } from '@/components/ui/actions/button'
 import { useCart } from '@/lib/cart-context'
+import { SocialLinks } from '@/components/store/social-links'
 
 const navigation = [
   { name: 'Inicio', href: '/' },
@@ -51,6 +52,19 @@ export function StoreHeader({ showAdminLink = false, isLoggedIn = false }: Store
               {item.name}
             </Link>
           ))}
+        </div>
+
+        {/* Social Links - Desktop only */}
+        <div className="hidden md:flex items-center">
+          <span className="w-px h-4 bg-border mx-2" />
+          <SocialLinks
+            facebook="https://www.facebook.com/MarkosBoganN"
+            instagram="https://instagram.com/lacasadelpez"
+            tiktok="https://www.tiktok.com/@markosbogante"
+            whatsapp="https://wa.me/50688888888"
+            size={18}
+          />
+          <span className="w-px h-4 bg-border mx-2" />
         </div>
 
         {/* Actions */}
