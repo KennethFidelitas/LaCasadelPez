@@ -4,6 +4,7 @@ import { StoreFooter } from '@/components/store/footer'
 import { CartDrawer } from '@/components/store/cart-drawer'
 import { Toaster } from '@/components/ui/feedback/sonner'
 import { createClient } from '@/lib/supabase/server'
+import { getStoreSettings, buildSocialUrls } from '@/lib/store-settings'
 
 type LayoutProfile = {
   role: 'customer' | 'admin' | 'employee'
@@ -31,10 +32,13 @@ export default async function StoreLayout({
     showAdminLink = profile?.role === 'admin'
   }
 
+  const settings = await getStoreSettings()
+  const socialUrls = buildSocialUrls(settings.redes, settings.mapas.wazeUrl)
+
   return (
     <CartProvider>
       <div className="flex min-h-screen flex-col">
-        <StoreHeader showAdminLink={showAdminLink} isLoggedIn={!!user} />
+        <StoreHeader showAdminLink={showAdminLink} isLoggedIn={!!user} socialUrls={socialUrls} />
         <main className="flex-1">{children}</main>
         <StoreFooter />
         <CartDrawer />

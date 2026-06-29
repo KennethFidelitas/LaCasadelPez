@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Fish, MapPin, Phone, Mail, Clock } from 'lucide-react'
+import { Fish, MapPin, Phone, Mail, Clock, Map, Navigation } from 'lucide-react'
 import { SocialLinks } from '@/components/store/social-links'
+import { getStoreSettings, buildSocialUrls } from '@/lib/store-settings'
 
 const footerLinks = {
   tienda: [
@@ -30,7 +31,10 @@ const footerLinks = {
   ],
 }
 
-export function StoreFooter() {
+export async function StoreFooter() {
+  const settings = await getStoreSettings()
+  const socialUrls = buildSocialUrls(settings.redes, settings.mapas.wazeUrl)
+
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
@@ -51,42 +55,57 @@ export function StoreFooter() {
               Expertos en acuarismo desde hace mas de 20 anos.
             </p>
             <div className="mt-6 space-y-3 text-sm text-muted-foreground">
-<div className="flex items-start gap-2">
-  <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-
-  <a
-    href="https://www.google.com/maps/place/Acuario+La+Casa+del+Pez/@9.9909666,-84.1494034,17z/data=!4m14!1m7!3m6!1s0x8fa0fa514f847539:0x1df03d824598f020!2sDirecci%C3%B3n+Regional+de+La+Fuerza+P%C3%BAblica,+Heredia!8m2!3d9.9909666!4d-84.1494034!16s%2Fg%2F1263nyywl!3m5!1s0x8fa0fa5366940905:0x43ce84e9e5e2f87c!8m2!3d9.9924201!4d-84.1489686!16s%2Fg%2F11b6hhr39h?entry=ttu&g_ep=EgoyMDI2MDYxNi4wIKXMDSoASAFQAw%3D%3D"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="hover:text-primary hover:underline"
-  >
-    La Aurora de Heredia, de la Fuerza Pública 300m norte, Heredia, Costa Rica, 40101
-  </a>
-</div>
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p>{settings.mapas.direccion}</p>
+                  <div className="mt-1 flex gap-3">
+                    {settings.mapas.googleMapsUrl && (
+                      <a
+                        href={settings.mapas.googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs hover:text-primary hover:underline"
+                      >
+                        <Map className="h-3 w-3" />
+                        Google Maps
+                      </a>
+                    )}
+                    {settings.mapas.wazeUrl && (
+                      <a
+                        href={settings.mapas.wazeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs hover:text-primary hover:underline"
+                      >
+                        <Navigation className="h-3 w-3" />
+                        Waze
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 shrink-0" />
-                <span>+00 000 000</span>
+                <span>{settings.mapas.telefono ?? '+00 000 000'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 shrink-0" />
                 <span>info@lacasadelpez.com</span>
               </div>
-              <div className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p>Lun - Vie: 10:00 - 20:00</p>
-                  <p>Sabado: 10:00 - 18:00</p>
-                  <p>Domingo: 11:00 - 15:00</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span>{settings.mapas.horaApertura} - {settings.mapas.horaCierre}</span>
               </div>
             </div>
             <div className="mt-4 border-t border-border pt-4">
               <p className="mb-3 text-sm text-muted-foreground">Síguenos</p>
               <SocialLinks
-                facebook="https://www.facebook.com/MarkosBoganN"
-                instagram="https://instagram.com/lacasadelpez"
-                tiktok="https://www.tiktok.com/@markosbogante"
-                whatsapp="https://wa.me/50688888888"
+                facebook={socialUrls.facebook}
+                instagram={socialUrls.instagram}
+                tiktok={socialUrls.tiktok}
+                whatsapp={socialUrls.whatsapp}
+                waze={socialUrls.waze}
               />
             </div>
           </div>

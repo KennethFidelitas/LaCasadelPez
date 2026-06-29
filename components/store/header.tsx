@@ -15,12 +15,21 @@ const navigation = [
   { name: 'Nosotros', href: '/nosotros' },
 ]
 
+type SocialUrls = {
+  facebook?: string
+  instagram?: string
+  tiktok?: string
+  whatsapp?: string
+  waze?: string
+}
+
 type StoreHeaderProps = {
   showAdminLink?: boolean
   isLoggedIn?: boolean
+  socialUrls?: SocialUrls
 }
 
-export function StoreHeader({ showAdminLink = false, isLoggedIn = false }: StoreHeaderProps) {
+export function StoreHeader({ showAdminLink = false, isLoggedIn = false, socialUrls }: StoreHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { totalItems, openCart } = useCart()
   const navigationItems = showAdminLink
@@ -55,17 +64,13 @@ export function StoreHeader({ showAdminLink = false, isLoggedIn = false }: Store
         </div>
 
         {/* Social Links - Desktop only */}
-        <div className="hidden md:flex items-center">
-          <span className="w-px h-4 bg-border mx-2" />
-          <SocialLinks
-            facebook="https://www.facebook.com/MarkosBoganN"
-            instagram="https://instagram.com/lacasadelpez"
-            tiktok="https://www.tiktok.com/@markosbogante"
-            whatsapp="https://wa.me/50688888888"
-            size={18}
-          />
-          <span className="w-px h-4 bg-border mx-2" />
-        </div>
+        {socialUrls && (
+          <div className="hidden md:flex items-center">
+            <span className="w-px h-4 bg-border mx-2" />
+            <SocialLinks {...socialUrls} size={18} />
+            <span className="w-px h-4 bg-border mx-2" />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2">
