@@ -39,3 +39,39 @@ export interface ArmaTuPeceraState {
   selectedFiltroId: string | null
   fishQuantities: Record<string, number>
 }
+
+
+export type AquariumMode = 'prediseno' | 'personalizada'
+
+export interface Iluminacion {
+  id: string
+  name: string
+  tipo: string            // LED, T5, Metal Halide...
+  potencia: string        // watts
+  cobertura: string       // cm de cobertura
+  minLitros: number
+  maxLitros: number
+  price: number
+  descripcion: string
+}
+
+export interface AccesorioOpcional {
+  id: string
+  name: string
+  categoria: string       // calefaccion, decoracion, sustrato, co2...
+  price: number
+  descripcion: string
+}
+
+export interface PeceraPrediseno extends Pecera {
+  descripcion: string
+  incluye: string[]       // qué viene incluido
+  waterType: WaterType[]  // compatible con qué tipo de agua
+}
+
+// Extiende el estado existente con los nuevos campos
+export interface ArmaTuPeceraStateExtended extends ArmaTuPeceraState {
+  mode: AquariumMode | null
+  selectedIluminacionId: string | null
+  accesoriosSeleccionados: Record<string, boolean>  // id -> seleccionado
+}
