@@ -43,6 +43,14 @@ export interface ArmaTuPeceraState {
 
 export type AquariumMode = 'prediseno' | 'personalizada'
 
+export interface CustomPeceraDimensions {
+  largo: number
+  ancho: number
+  alto: number
+}
+
+export type CustomGlassType = 'claro-6mm' | 'claro-8mm' | 'templado-10mm' | 'templado-12mm'
+
 export interface Iluminacion {
   id: string
   name: string

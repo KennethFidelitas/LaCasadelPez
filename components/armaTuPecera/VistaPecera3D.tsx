@@ -1,17 +1,7 @@
 'use client'
 
-import { Canvas, useFrame } from '@react-three/fiber'
-import { useTexture } from '@react-three/drei'
-import {
-  Environment,
-  OrbitControls,
-  RoundedBox,
-  Image,
-  Billboard,
-} from '@react-three/drei'
-import { Suspense, useMemo, useRef } from 'react'
-import * as THREE from 'three'
-import { PECERAS, FILTROS, PECES } from './data'
+import { useMemo } from 'react'
+import { FILTROS, PECERAS, PECES } from './data'
 import type { WaterType } from './types'
 
 interface Props {
@@ -24,11 +14,12 @@ interface Props {
 interface PezEscena {
   id: string
   instance: number
+  name: string
   color: string
   image?: string
-  position: [number, number, number]
-  speed: number
-  direction: number
+  left: number
+  top: number
+  delay: number
 }
 
 export function VistaPecera3D({
@@ -48,18 +39,16 @@ export function VistaPecera3D({
       if (!pez) return
 
       for (let index = 0; index < cantidad; index += 1) {
+        const globalIndex = resultado.length
         resultado.push({
           id: pez.id,
           instance: index,
+          name: pez.name,
           color: obtenerColorPez(pez.id),
           image: pez.image,
-          position: [
-          -1.3 + Math.random() * 2.6,
-          -0.35 + Math.random() * 1.15,
-          0.65,
-        ],
-          speed: 0.4 + Math.random() * 0.3,
-          direction: Math.random() > 0.5 ? 1 : -1,
+          left: 14 + ((globalIndex * 17) % 68),
+          top: 24 + ((globalIndex * 19) % 48),
+          delay: (globalIndex % 6) * 0.45,
         })
       }
     })
@@ -70,18 +59,22 @@ export function VistaPecera3D({
   if (!pecera) {
     return (
       <div className="rounded-xl border border-border bg-background p-8 text-center text-sm text-muted-foreground">
-        Selecciona una pecera para activar la vista 3D.
+        Selecciona una pecera para activar la vista previa.
       </div>
     )
   }
+
+  const waterClass = waterType === 'salada'
+    ? 'from-sky-500/35 via-cyan-400/20 to-blue-700/35'
+    : 'from-emerald-500/30 via-teal-400/20 to-cyan-700/30'
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-slate-950">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-white">
         <div>
-          <h3 className="text-sm font-semibold">Vista 3D de tu pecera</h3>
+          <h3 className="text-sm font-semibold">Vista previa de tu pecera</h3>
           <p className="text-xs text-slate-400">
-            Arrastra para girar y usa la rueda para acercar.
+            Representación visual de capacidad, filtro y fauna seleccionada.
           </p>
         </div>
 
@@ -90,250 +83,97 @@ export function VistaPecera3D({
         </span>
       </div>
 
-      <div className="h-[480px] w-full">
-        <Canvas
-          camera={{
-            position: [0, 2.4, 8],
-            fov: 45,
-          }}
-          shadows
-        >
-          <Suspense fallback={null}>
-            <color attach="background" args={['#071827']} />
+      <div className="relative h-[420px] w-full overflow-hidden bg-[radial-gradient(circle_at_top,#12385a,#06111f_58%)]">
+        <div className="absolute inset-x-[8%] bottom-12 top-12 rounded-xl border border-cyan-100/35 bg-white/5 shadow-2xl shadow-cyan-500/10">
+          <div className={`absolute inset-3 rounded-lg bg-gradient-to-br ${waterClass}`} />
+          <div className="absolute inset-3 rounded-lg bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.20)_18%,transparent_34%)]" />
 
-            <ambientLight intensity={1.4} />
-            <directionalLight
-              position={[4, 7, 4]}
-              intensity={2}
-              castShadow
-            />
-            <pointLight
-              position={[-4, 3, 2]}
-              intensity={10}
-              color="#8be9ff"
-            />
-
-            <Acuario
-              waterType={waterType}
-              mostrarFiltro={Boolean(filtro)}
-              escala={obtenerEscalaPecera(pecera.litros)}
-            />
-
-            {peces.map(pez => (
-              <PezAnimado
-                key={`${pez.id}-${pez.instance}`}
-                {...pez}
+          <div className="absolute inset-x-6 bottom-4 h-8 rounded-[50%] bg-amber-200/50 blur-sm" />
+          <div className="absolute inset-x-8 bottom-5 flex justify-between">
+            {Array.from({ length: 14 }).map((_, index) => (
+              <span
+                key={index}
+                className="block rounded-full bg-slate-200/80"
+                style={{
+                  width: `${8 + (index % 4) * 3}px`,
+                  height: `${5 + (index % 3) * 2}px`,
+                }}
               />
             ))}
+          </div>
 
-            <Environment preset="warehouse" />
+          <Plant className="left-[10%] h-28" />
+          <Plant className="left-[18%] h-20" />
+          <Plant className="right-[14%] h-24" />
+          <Plant className="right-[23%] h-16" />
 
-            <OrbitControls
-              enablePan={false}
-              minDistance={5}
-              maxDistance={11}
-              minPolarAngle={Math.PI / 4}
-              maxPolarAngle={Math.PI / 2.05}
-            />
-          </Suspense>
-        </Canvas>
+          {filtro && (
+            <div className="absolute right-5 top-12 h-40 w-9 rounded-md bg-slate-900/90 shadow-lg">
+              <div className="mx-auto mt-3 h-24 w-5 rounded bg-slate-700" />
+              <div className="absolute -left-5 top-5 h-3 w-7 rounded bg-slate-700" />
+              <div className="absolute -left-4 top-12 grid gap-1">
+                <Bubble />
+                <Bubble className="ml-2" />
+                <Bubble className="ml-1" />
+              </div>
+            </div>
+          )}
+
+          {peces.map(pez => (
+            <FishPreview key={`${pez.id}-${pez.instance}`} pez={pez} />
+          ))}
+
+          {peces.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/55">
+              Agrega peces para verlos en la vista previa.
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
 }
 
-function Acuario({
-  waterType,
-  mostrarFiltro,
-  escala,
-}: {
-  waterType: WaterType | null
-  mostrarFiltro: boolean
-  escala: number
-}) {
-  const waterColor = waterType === 'salada'
-    ? '#168bcc'
-    : '#4ba58c'
-
+function FishPreview({ pez }: { pez: PezEscena }) {
   return (
-    <group scale={[escala, escala, escala]}>
-      {/* Agua */}
-      <RoundedBox
-        args={[6, 3.6, 3]}
-        radius={0.12}
-        smoothness={4}
-        position={[0, 0.4, 0]}
-      >
-        <meshPhysicalMaterial
-          color={waterColor}
-          transparent
-          opacity={0.34}
-          transmission={0.35}
-          roughness={0.15}
-          thickness={0.5}
-        />
-      </RoundedBox>
-
-      {/* Base */}
-      <mesh position={[0, -1.25, 0]} receiveShadow>
-        <boxGeometry args={[5.85, 0.28, 2.85]} />
-        <meshStandardMaterial color="#8b6c42" roughness={1} />
-      </mesh>
-
-      {/* Piedras */}
-      {Array.from({ length: 18 }).map((_, index) => (
-        <mesh
-          key={index}
-          position={[
-            -2.5 + (index % 6),
-            -1.02,
-            -1 + Math.floor(index / 6),
-          ]}
-          scale={[
-            0.2 + (index % 3) * 0.08,
-            0.12,
-            0.18,
-          ]}
-          castShadow
-        >
-          <sphereGeometry args={[1, 12, 12]} />
-          <meshStandardMaterial
-            color={index % 2 === 0 ? '#6b7280' : '#a78b6d'}
-          />
-        </mesh>
-      ))}
-
-      {/* Plantas */}
-        <Planta position={[-2.1, -1.08, -1.15]} height={1.5} />
-        <Planta position={[-1.25, -1.08, -1.2]} height={1.15} />
-        <Planta position={[1.55, -1.08, -1.2]} height={1.35} />
-        <Planta position={[2.1, -1.08, -1.15]} height={1.05} />
-
-      {/* Filtro */}
-      {mostrarFiltro && (
-        <group position={[2.55, 0.05, -1.1]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.35, 1.7, 0.45]} />
-            <meshStandardMaterial color="#111827" />
-          </mesh>
-
-          <mesh position={[-0.25, 0.65, 0]}>
-            <boxGeometry args={[0.55, 0.15, 0.15]} />
-            <meshStandardMaterial color="#374151" />
-          </mesh>
-        </group>
-      )}
-    </group>
-  )
-}
-
-function Planta({
-  position,
-  height,
-}: {
-  position: [number, number, number]
-  height: number
-}) {
-  const ref = useRef<THREE.Group>(null)
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return
-
-    ref.current.rotation.z =
-      Math.sin(clock.elapsedTime * 1.1 + position[0]) * 0.04
-  })
-
-  return (
-    <group ref={ref} position={position}>
-      {[-0.18, 0, 0.18].map((offset, index) => (
-        <mesh
-          key={index}
-          position={[offset, height / 2, 0]}
-          rotation={[0, 0, offset * 0.45]}
-        >
-          <planeGeometry args={[0.22, height]} />
-
-          <meshStandardMaterial
-            color={index === 1 ? '#16a34a' : '#22c55e'}
-            side={THREE.DoubleSide}
-            transparent
-            opacity={0.95}
-          />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function PezAnimado({
-  position,
-  color,
-  speed,
-  image,
-}: PezEscena) {
-  const ref = useRef<THREE.Group>(null)
-  const initialX = position[0]
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return
-
-    const tiempo = clock.elapsedTime * speed + initialX
-    const movement = Math.sin(tiempo) * 0.8
-
-    ref.current.position.x = THREE.MathUtils.clamp(
-      initialX + movement,
-      -1.55,
-      1.55
-    )
-
-    ref.current.position.y = THREE.MathUtils.clamp(
-      position[1] +
-        Math.sin(clock.elapsedTime + initialX) * 0.08,
-      -0.45,
-      0.95
-    )
-  })
-
-  return (
-    <group
-      ref={ref}
-      position={[position[0], position[1], 0.7]}
+    <div
+      className="absolute z-10 flex h-12 w-16 items-center justify-center rounded-full"
+      style={{
+        left: `${pez.left}%`,
+        top: `${pez.top}%`,
+        transform: 'translate(-50%, -50%)',
+        animation: `fish-drift 5.5s ease-in-out ${pez.delay}s infinite alternate`,
+      }}
+      title={pez.name}
     >
-      {image ? (
-        <Billboard follow>
-          <Image
-            url={`/${image}`}
-            scale={[1.2, 0.8]}
-            transparent
-            toneMapped={false}
-          />
-        </Billboard>
+      {pez.image ? (
+        <img src={`/${pez.image}`} alt={pez.name} className="max-h-12 max-w-16 object-contain drop-shadow-lg" />
       ) : (
-        <group scale={0.35}>
-          <mesh scale={[1.3, 0.75, 0.48]}>
-            <sphereGeometry args={[1, 24, 24]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-
-          <mesh
-            position={[-1.25, 0, 0]}
-            rotation={[0, 0, Math.PI / 2]}
-          >
-            <coneGeometry args={[0.7, 1.1, 3]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-        </group>
+        <div className="relative h-6 w-11">
+          <div className="absolute left-2 top-0 h-6 w-8 rounded-[50%]" style={{ backgroundColor: pez.color }} />
+          <div
+            className="absolute left-0 top-1 h-0 w-0 border-y-[8px] border-r-[13px] border-y-transparent"
+            style={{ borderRightColor: pez.color }}
+          />
+          <div className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-slate-950" />
+        </div>
       )}
-    </group>
+    </div>
   )
 }
 
-function obtenerEscalaPecera(litros: number) {
-  if (litros <= 20) return 0.75
-  if (litros <= 60) return 0.88
-  if (litros <= 120) return 1
-  if (litros <= 200) return 1.08
-  return 1.16
+function Plant({ className }: { className: string }) {
+  return (
+    <div className={`absolute bottom-7 w-10 ${className}`}>
+      <span className="absolute bottom-0 left-4 h-full w-2 origin-bottom rounded-full bg-emerald-500/80" />
+      <span className="absolute bottom-0 left-2 h-[82%] w-2 origin-bottom -rotate-12 rounded-full bg-green-400/80" />
+      <span className="absolute bottom-0 left-6 h-[72%] w-2 origin-bottom rotate-12 rounded-full bg-lime-400/75" />
+    </div>
+  )
+}
+
+function Bubble({ className = '' }: { className?: string }) {
+  return <span className={`block h-2 w-2 rounded-full bg-cyan-100/70 ${className}`} />
 }
 
 function obtenerColorPez(id: string) {

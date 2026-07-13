@@ -18,6 +18,17 @@ export interface PosSaleRecord {
   paymentMethod: string
   createdAt: string
   transactionNumber: string | null
+  items?: PosSaleLineItem[]
+}
+
+export interface PosSaleLineItem {
+  id: string
+  productId: string | null
+  name: string
+  sku: string
+  quantity: number
+  unitPrice: number
+  total: number
 }
 
 export interface PosTopProduct {
