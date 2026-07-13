@@ -6,6 +6,7 @@ import {
   Activity,
   Bell,
   Boxes,
+  CheckCircle,
   ChevronRight,
   CreditCard,
   Factory,
@@ -16,13 +17,26 @@ import {
   Plus,
   Printer,
   Receipt,
+  Repeat,
   Search,
   Settings2,
   ShoppingCart,
   Store,
   Users,
   Wallet,
+  XCircle,
 } from 'lucide-react'
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
@@ -38,7 +52,7 @@ import { createCustomerContact } from '@/lib/customers/actions'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { createPosSale } from '@/lib/pos/actions'
-import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
+import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
 
 type ModuleKey =
   | 'overview'
@@ -49,6 +63,7 @@ type ModuleKey =
   | 'customers'
   | 'credits'
   | 'reports'
+  | 'returns'
   | 'settings'
 
 type PosProduct = PosCatalogProduct
@@ -94,6 +109,7 @@ const modules = [
   { key: 'customers', label: 'Clientes', icon: Users },
   { key: 'credits', label: 'Creditos', icon: Wallet },
   { key: 'reports', label: 'Reportes', icon: FileText },
+  { key: 'returns', label: 'Devoluciones', icon: Repeat },
   { key: 'settings', label: 'Configuracion', icon: Settings2 },
 ] as const satisfies ReadonlyArray<{
   key: ModuleKey
@@ -122,6 +138,8 @@ interface AdminDashboardProps {
   sales: PosSaleRecord[]
   salesError?: string | null
   salesSummary: PosSalesSummary
+  topProducts: PosTopProduct[]
+  returnRequests: PosReturnRequest[]
   customers: CustomerContactRecord[]
   customersError?: string | null
 }
@@ -159,6 +177,8 @@ export function AdminDashboard({
   sales,
   salesError = null,
   salesSummary,
+  topProducts = [],
+  returnRequests = [],
   customers,
   customersError = null,
 }: AdminDashboardProps) {
@@ -231,6 +251,8 @@ export function AdminDashboard({
   const [inventorySearch, setInventorySearch] = useState('')
   const [orders, setOrders] = useState(sales)
   const [summary, setSummary] = useState(salesSummary)
+  const [topSellingProducts, setTopSellingProducts] = useState<PosTopProduct[]>(topProducts ?? [])
+  const [returnRequestsList, setReturnRequestsList] = useState<PosReturnRequest[]>(returnRequests ?? [])
   const [customerRecords, setCustomerRecords] = useState(customers)
   const [customerForm, setCustomerForm] = useState(initialCustomerForm)
   const [isPending, startSavingSale] = useTransition()
@@ -299,14 +321,55 @@ export function AdminDashboard({
     )
   }, [inventoryItems, inventorySearch])
 
+  const salesTimeline = useMemo(() => {
+    const grouped: Record<string, number> = {}
+
+    sales.forEach((sale) => {
+      const date = new Date(sale.createdAt).toLocaleDateString('es-CR', {
+        day: '2-digit',
+        month: '2-digit',
+      })
+      grouped[date] = (grouped[date] ?? 0) + sale.total
+    })
+
+    return Object.entries(grouped)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([date, total]) => ({ date, total }))
+  }, [sales])
+
+  const salesByChannel = useMemo(() => {
+    const grouped: Record<string, number> = {}
+
+    sales.forEach((sale) => {
+      grouped[sale.channel] = (grouped[sale.channel] ?? 0) + sale.total
+    })
+
+    return Object.entries(grouped).map(([channel, total]) => ({ channel, total }))
+  }, [sales])
+
   const customerSuggestions = useMemo(
     () => customerRecords.map((customer) => customer.fullName).filter(Boolean),
     [customerRecords],
   )
 
-  function addToCart(product: PosProduct) {
-    if (product.stock <= 0) return
+  const returnSummary = useMemo(() => {
+    const pending = returnRequestsList.filter((request) => request.requestStatus === 'Pendiente').length
+    const approved = returnRequestsList.filter((request) => request.requestStatus === 'Aprobada').length
+    const rejected = returnRequestsList.filter((request) => request.requestStatus === 'Rechazada').length
+    const totalRefund = returnRequestsList.reduce((sum, request) => sum + request.refundAmount, 0)
 
+    return { pending, approved, rejected, totalRefund }
+  }, [returnRequestsList])
+
+  function updateReturnRequestStatus(id: string, status: 'Aprobada' | 'Rechazada') {
+    setReturnRequestsList((current) =>
+      current.map((request) =>
+        request.id === id ? { ...request, requestStatus: status } : request,
+      ),
+    )
+  }
+
+  function addToCart(product: PosProduct) {
     setCartItems((current) => {
       const existing = current.find((item) => item.id === product.id)
       if (existing) {
@@ -1219,6 +1282,114 @@ async function sendTestEmail() {
               </section>
             )}
 
+            {activeModule === 'returns' && (
+              <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Solicitudes de devolución</CardTitle>
+                    <CardDescription>Revisa solicitudes y actualiza el estado de reembolso.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {returnRequestsList.length === 0 ? (
+                      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                        No hay solicitudes de devolución pendientes o aprobadas.
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Pedido</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Solicitado</TableHead>
+                            <TableHead>Monto</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Pago</TableHead>
+                            <TableHead>Acción</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {returnRequestsList.map((request) => (
+                            <TableRow key={request.id}>
+                              <TableCell>
+                                <div className="font-medium">{request.orderNumber}</div>
+                                <div className="text-xs text-muted-foreground">{request.customer}</div>
+                              </TableCell>
+                              <TableCell>{request.customer}</TableCell>
+                              <TableCell>{formatDateTime(request.requestedAt)}</TableCell>
+                              <TableCell>{formatPrice(request.refundAmount)}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    request.requestStatus === 'Aprobada'
+                                      ? 'secondary'
+                                      : request.requestStatus === 'Rechazada'
+                                        ? 'destructive'
+                                        : 'outline'
+                                  }
+                                >
+                                  {request.requestStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{request.paymentStatus}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-2">
+                                  {request.requestStatus === 'Pendiente' && (
+                                    <>
+                                      <Button size="sm" onClick={() => updateReturnRequestStatus(request.id, 'Aprobada')}>
+                                        Aprobar
+                                      </Button>
+                                      <Button size="sm" variant="destructive" onClick={() => updateReturnRequestStatus(request.id, 'Rechazada')}>
+                                        Rechazar
+                                      </Button>
+                                    </>
+                                  )}
+                                  {request.requestStatus !== 'Pendiente' && (
+                                    <span className="text-xs text-muted-foreground">Sin acciones disponibles</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Resumen de devoluciones</CardTitle>
+                    <CardDescription>Indicadores de solicitudes por estado y monto de reembolsos.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <OverviewCard
+                      title="Pendientes"
+                      value={String(returnSummary.pending)}
+                      icon={Repeat}
+                      detail="Solicitudes que requieren revisión."
+                    />
+                    <OverviewCard
+                      title="Aprobadas"
+                      value={String(returnSummary.approved)}
+                      icon={CheckCircle}
+                      detail="Reembolsos ya procesados."
+                    />
+                    <OverviewCard
+                      title="Rechazadas"
+                      value={String(returnSummary.rejected)}
+                      icon={XCircle}
+                      detail="Solicitudes que no proceden."
+                    />
+                    <MetricCard
+                      title="Total reembolsado"
+                      value={formatPrice(returnSummary.totalRefund)}
+                      detail="Monto acumulado en devoluciones."
+                    />
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
             {activeModule === 'production' && (
               <section className="grid gap-6">
                 <Card className="rounded-lg">
@@ -1376,6 +1547,81 @@ async function sendTestEmail() {
 
             {activeModule === 'reports' && (
               <section className="grid gap-6">
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Generar reportes</CardTitle>
+                    <CardDescription>Accede a reportes importantes de crédito, mortalidad e inventario.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <Button asChild>
+                      <Link href="/credito" className="w-full justify-center">
+                        <Wallet className="mr-2 h-4 w-4" />
+                        Ver reporte de crédito
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/reporte-mortalidad" className="w-full justify-center">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Reporte mortalidad
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/mortalidad" className="w-full justify-center">
+                        <Activity className="mr-2 h-4 w-4" />
+                        Gráficos mortalidad
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/inventario/imprimir-reporte" className="w-full justify-center">
+                        <Printer className="mr-2 h-4 w-4" />
+                        Imprimir reporte de inventario
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <Card className="rounded-lg">
+                    <CardHeader>
+                      <CardTitle>Ventas por fecha</CardTitle>
+                      <CardDescription>Identifica tendencias de ingresos en periodos recientes.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={salesTimeline} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
+                          <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}
+                          />
+                          <Line type="monotone" dataKey="total" stroke="#0f766e" strokeWidth={3} dot={{ r: 3, strokeWidth: 2, fill: '#0f766e' }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-lg">
+                    <CardHeader>
+                      <CardTitle>Ventas por canal</CardTitle>
+                      <CardDescription>Distribución de facturación entre POS, online y teléfono.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={salesByChannel} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis dataKey="channel" tick={{ fill: '#64748b', fontSize: 12 }} />
+                          <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}
+                          />
+                          <Bar dataKey="total" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard
                     title="Ventas del día"
@@ -1399,6 +1645,32 @@ async function sendTestEmail() {
                   />
                 </div>
 
+                <Card className="rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Productos más vendidos</CardTitle>
+                    <CardDescription>Optimiza inventario y promociones con los artículos que más se venden.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3">
+                    {topSellingProducts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No hay datos de productos vendidos.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {topSellingProducts.map((product, index) => (
+                          <div key={product.productId} className="flex items-center justify-between rounded-lg border p-3">
+                            <div>
+                              <p className="font-medium text-foreground">{index + 1}. {product.name}</p>
+                              <p className="text-xs text-muted-foreground">{product.sku}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">{product.soldQuantity} unidades</p>
+                              <p className="text-xs text-muted-foreground">{formatPrice(product.revenue)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
                 <Card className="rounded-lg">
                   <CardHeader>
                     <CardTitle>Indicadores del sistema</CardTitle>
@@ -1683,6 +1955,7 @@ function getModuleTitle(module: ModuleKey) {
     pos: 'Punto de venta',
     inventory: 'Inventario y catalogo',
     orders: 'Pedidos y operacion e-commerce',
+    returns: 'Devoluciones y reembolsos',
     production: 'Produccion de peceras',
     customers: 'Clientes y creditos',
     credits: 'Gestion crediticia',
@@ -1699,6 +1972,7 @@ function getModuleDescription(module: ModuleKey) {
     pos: 'Frontend para caja, carrito del vendedor, descuentos, apartados y pagos.',
     inventory: 'Modulo de control de stock, costos, alertas y ajustes manuales.',
     orders: 'Seguimiento de pedidos por canal, estados y cumplimiento.',
+    returns: 'Gestiona solicitudes de devolucion y el estado de reembolso.',
     production: 'Tablero de fabricacion y avances de proyectos personalizados.',
     customers: 'Panel para perfiles, segmentacion, saldos y seguimiento.',
     credits: 'Registro, edicion, eliminacion y consulta de creditos para clientes.',

@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Minus, Plus, Fish as FishIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { StepSection } from './StepSection'
 import { ResumenSidebar } from './ResumenSidebar'
 import { PECERAS, FILTROS, PECES, formatColones } from './data'
 import type { ArmaTuPeceraState, WaterType, Fish, Filtro, Pecera } from './types'
+import { VistaPecera3D } from './VistaPecera3D'
 
 const LITROS_POR_PEZ = 5
+const DRAFT_STORAGE_KEY = 'arma-tu-pecera-draft'
 
 const INITIAL_STATE: ArmaTuPeceraState = {
   waterType: null,
@@ -18,6 +21,60 @@ const INITIAL_STATE: ArmaTuPeceraState = {
 
 export function ArmaTuPeceraBuilder() {
   const [state, setState] = useState<ArmaTuPeceraState>(INITIAL_STATE)
+  const [hasDraft, setHasDraft] = useState(false)
+
+  // Load saved draft on first render
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (!saved) return
+
+      const draft = JSON.parse(saved) as ArmaTuPeceraState
+      if (!draft || typeof draft !== 'object') return
+
+      setState(draft)
+      setHasDraft(true)
+      toast.success('Se cargó tu última configuración guardada.')
+    } catch {
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
+    }
+  }, [])
+
+  const handleSaveDraft = useCallback(() => {
+    try {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(state))
+      setHasDraft(true)
+      toast.success('Configuración guardada. Puedes completarla después.')
+    } catch {
+      toast.error('No se pudo guardar la configuración.')
+    }
+  }, [state])
+
+  const handleLoadDraft = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (!saved) {
+        setHasDraft(false)
+        toast.error('No hay configuración guardada.')
+        return
+      }
+
+      const draft = JSON.parse(saved) as ArmaTuPeceraState
+      setState(draft)
+      setHasDraft(true)
+      toast.success('Configuración guardada cargada correctamente.')
+    } catch {
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
+      setHasDraft(false)
+      toast.error('No se pudo cargar la configuración guardada.')
+    }
+  }, [])
+
+  const handleClearDraft = useCallback(() => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    setHasDraft(false)
+    toast.success('Se borró la configuración guardada.')
+  }, [])
 
   // Derived selections
   const selectedPecera = useMemo(
@@ -73,6 +130,14 @@ export function ArmaTuPeceraBuilder() {
     return sum
   }, [selectedPecera, selectedFiltro, state.fishQuantities])
 
+  const fishItems = useMemo(
+    () =>
+      Object.entries(state.fishQuantities)
+        .map(([fishId, qty]) => ({ fish: PECES.find(f => f.id === fishId), qty }))
+        .filter((item): item is { fish: Fish; qty: number } => Boolean(item.fish)),
+    [state.fishQuantities]
+  )
+
   // --- Handlers ---
   const handleSelectWaterType = (wt: WaterType) => {
     setState({ waterType: wt, selectedPeceraId: null, selectedFiltroId: null, fishQuantities: {} })
@@ -111,6 +176,7 @@ export function ArmaTuPeceraBuilder() {
       return { ...prev, fishQuantities: quantities }
     })
   const handleClear = () => setState(INITIAL_STATE)
+  const handlePrint = () => window.print()
 
   // Step gating
   const step1Done = state.waterType !== null
@@ -121,176 +187,280 @@ export function ArmaTuPeceraBuilder() {
     ? Math.min(100, (litrosUsados / selectedPecera.litros) * 100)
     : 0
 
+  const hasSelectedItems = selectedPecera !== null || selectedFiltro !== null || totalPeces > 0
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Arma tu Pecera</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configura tu acuario paso a paso — cada elección desbloquea el siguiente paso.
-        </p>
-      </div>
+    <>
+      <div className="hidden print:block">
+        <div className="mx-auto max-w-4xl px-6 py-10 text-foreground">
+          <div className="mb-8 border-b border-border pb-6">
+            <h1 className="text-3xl font-bold">Presupuesto de Pecera</h1>
+            <p className="mt-2 text-sm text-muted-foreground">La Casa del Pez</p>
+          </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_288px]">
-        {/* Builder column */}
-        <div className="flex flex-col gap-4">
-          {/* Step 1 — Water type */}
-          <StepSection
-            step={1}
-            title="Tipo de agua"
-            description="Define el ecosistema base de tu acuario"
-            isCompleted={step1Done}
-            isLocked={false}
-          >
-            <div className="grid grid-cols-2 gap-3">
-              <WaterTypeCard
-                type="dulce"
-                selected={state.waterType === 'dulce'}
-                onClick={() => handleSelectWaterType('dulce')}
-              />
-              <WaterTypeCard
-                type="salada"
-                selected={state.waterType === 'salada'}
-                onClick={() => handleSelectWaterType('salada')}
-              />
-            </div>
-          </StepSection>
-
-          {/* Step 2 — Pecera */}
-          <StepSection
-            step={2}
-            title="Pecera"
-            description="Elige el tamaño que más se ajuste a tu espacio"
-            isCompleted={step2Done}
-            isLocked={!step1Done}
-          >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {PECERAS.map(pecera => (
-                <PeceraCard
-                  key={pecera.id}
-                  pecera={pecera}
-                  selected={state.selectedPeceraId === pecera.id}
-                  onClick={() => handleSelectPecera(pecera.id)}
-                />
-              ))}
-            </div>
-          </StepSection>
-
-          {/* Step 3 — Filtro */}
-          <StepSection
-            step={3}
-            title="Filtro"
-            description="Solo los filtros compatibles con tu pecera son seleccionables"
-            isCompleted={step3Done}
-            isLocked={!step2Done}
-          >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {FILTROS.map(filtro => {
-                const compatible = selectedPecera
-                  ? selectedPecera.litros >= filtro.minLitros &&
-                    selectedPecera.litros <= filtro.maxLitros
-                  : false
-                return (
-                  <FiltroCard
-                    key={filtro.id}
-                    filtro={filtro}
-                    selected={state.selectedFiltroId === filtro.id}
-                    compatible={compatible}
-                    onClick={() => compatible && handleSelectFiltro(filtro.id)}
-                  />
-                )
-              })}
-            </div>
-          </StepSection>
-
-          {/* Step 4 — Peces */}
-          <StepSection
-            step={4}
-            title="Peces y fauna"
-            description={
-              state.waterType
-                ? `Mostrando especies de agua ${state.waterType}`
-                : 'Selecciona el tipo de agua primero'
-            }
-            isCompleted={Object.keys(state.fishQuantities).length > 0}
-            isLocked={!step3Done}
-          >
-            {/* Density bar */}
-            {selectedPecera && (
-              <div className="mb-4">
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Densidad del acuario</span>
-                  <span
-                    className={`font-mono font-medium ${
-                      densityPercent >= 90
-                        ? 'text-coral'
-                        : densityPercent >= 70
-                        ? 'text-sand'
-                        : 'text-teal'
-                    }`}
-                  >
-                    {Math.round(densityPercent)}%
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      densityPercent >= 90
-                        ? 'bg-coral'
-                        : densityPercent >= 70
-                        ? 'bg-sand'
-                        : 'bg-teal'
-                    }`}
-                    style={{ width: `${densityPercent}%` }}
-                  />
-                </div>
-                {densityPercent >= 90 && (
-                  <p className="mt-1.5 text-xs text-coral">
-                    Capacidad crítica — considera una pecera más grande o reducir peces.
-                  </p>
-                )}
-                {densityPercent >= 70 && densityPercent < 90 && (
-                  <p className="mt-1.5 text-xs text-sand">
-                    Acercándose al límite recomendado de densidad.
-                  </p>
-                )}
+          <section className="mb-6">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Resumen de la configuración
+            </h2>
+            <dl className="grid gap-2 text-sm leading-relaxed">
+              <div className="flex justify-between">
+                <dt>Tipo de agua</dt>
+                <dd>{state.waterType === 'salada' ? 'Agua Salada' : state.waterType === 'dulce' ? 'Agua Dulce' : 'No seleccionada'}</dd>
               </div>
+              <div className="flex justify-between">
+                <dt>Pecera</dt>
+                <dd>{selectedPecera?.name ?? 'No seleccionada'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Filtro</dt>
+                <dd>{selectedFiltro?.name ?? 'No seleccionado'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Litros usados</dt>
+                <dd>{selectedPecera ? `${litrosUsados}L / ${selectedPecera.litros}L` : '—'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Total de peces</dt>
+                <dd>{totalPeces}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="mb-6">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Desglose de peces
+            </h2>
+            {fishItems.length > 0 ? (
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="border-b border-border pb-2 text-left">Especie</th>
+                    <th className="border-b border-border pb-2 text-right">Cantidad</th>
+                    <th className="border-b border-border pb-2 text-right">Precio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fishItems.map(({ fish, qty }) => (
+                    <tr key={fish.id}>
+                      <td className="py-2">{fish.name}</td>
+                      <td className="py-2 text-right">{qty}</td>
+                      <td className="py-2 text-right">{formatColones(fish.price * qty)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No hay peces seleccionados.</p>
             )}
+          </section>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-2">
-              {availableFish.map(fish => {
-                const qty = state.fishQuantities[fish.id] ?? 0
-                const isIncompatible = incompatibleFishIds.has(fish.id)
-                return (
-                  <FishCard
-                    key={fish.id}
-                    fish={fish}
-                    qty={qty}
-                    isIncompatible={isIncompatible}
-                    onAdd={() => handleFishQty(fish.id, 1)}
-                    onRemove={() => handleFishQty(fish.id, -1)}
-                  />
-                )
-              })}
+          <section className="mb-6">
+            <div className="flex justify-between border-t border-border pt-4 text-base font-semibold">
+              <span>Total del presupuesto</span>
+              <span>{formatColones(total)}</span>
             </div>
-          </StepSection>
-        </div>
+          </section>
 
-        {/* Sidebar column */}
-        <div className="sticky top-4 self-start">
-          <ResumenSidebar
-            state={state}
-            total={total}
-            litrosUsados={litrosUsados}
-            totalPeces={totalPeces}
-            onRemoveWaterType={handleRemoveWaterType}
-            onRemovePecera={handleRemovePecera}
-            onRemoveFiltro={handleRemoveFiltro}
-            onRemoveFish={handleRemoveFish}
-            onClear={handleClear}
-          />
+          <footer className="text-xs text-muted-foreground">
+            Documento generado el {new Date().toLocaleDateString('es-CR')}.
+          </footer>
         </div>
       </div>
-    </div>
+
+      <div className="mx-auto max-w-7xl px-4 py-8 print:hidden">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Arma tu Pecera</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configura tu acuario paso a paso — cada elección desbloquea el siguiente paso.
+          </p>
+          <div className="mt-4 rounded-3xl border border-border bg-secondary/70 p-4 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-foreground/80">Precio total final</span>
+              <span className="font-mono text-lg font-semibold text-primary">
+                {formatColones(total)}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Se suma el precio de la pecera, el filtro y todas las especies seleccionadas.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_288px]">
+          {/* Builder column */}
+          <div className="flex flex-col gap-4">
+            {/* Step 1 — Water type */}
+            <StepSection
+              step={1}
+              title="Tipo de agua"
+              description="Define el ecosistema base de tu acuario"
+              isCompleted={step1Done}
+              isLocked={false}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <WaterTypeCard
+                  type="dulce"
+                  selected={state.waterType === 'dulce'}
+                  onClick={() => handleSelectWaterType('dulce')}
+                />
+                <WaterTypeCard
+                  type="salada"
+                  selected={state.waterType === 'salada'}
+                  onClick={() => handleSelectWaterType('salada')}
+                />
+              </div>
+            </StepSection>
+
+            {/* Step 2 — Pecera */}
+            <StepSection
+              step={2}
+              title="Pecera"
+              description="Elige el tamaño que más se ajuste a tu espacio"
+              isCompleted={step2Done}
+              isLocked={!step1Done}
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {PECERAS.map(pecera => (
+                  <PeceraCard
+                    key={pecera.id}
+                    pecera={pecera}
+                    selected={state.selectedPeceraId === pecera.id}
+                    onClick={() => handleSelectPecera(pecera.id)}
+                  />
+                ))}
+              </div>
+            </StepSection>
+
+            {/* Step 3 — Filtro */}
+            <StepSection
+              step={3}
+              title="Filtro"
+              description="Solo los filtros compatibles con tu pecera son seleccionables"
+              isCompleted={step3Done}
+              isLocked={!step2Done}
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {FILTROS.map(filtro => {
+                  const compatible = selectedPecera
+                    ? selectedPecera.litros >= filtro.minLitros &&
+                      selectedPecera.litros <= filtro.maxLitros
+                    : false
+                  return (
+                    <FiltroCard
+                      key={filtro.id}
+                      filtro={filtro}
+                      selected={state.selectedFiltroId === filtro.id}
+                      compatible={compatible}
+                      litrosPecera={selectedPecera?.litros ?? null}
+                      onClick={() => compatible && handleSelectFiltro(filtro.id)}
+                    />
+                  )
+                })}
+              </div>
+            </StepSection>
+
+            {/* Step 4 — Peces */}
+            <StepSection
+              step={4}
+              title="Peces y fauna"
+              description={
+                state.waterType
+                  ? `Mostrando especies de agua ${state.waterType}`
+                  : 'Selecciona el tipo de agua primero'
+              }
+              isCompleted={Object.keys(state.fishQuantities).length > 0}
+              isLocked={!step3Done}
+            >
+              {/* Density bar */}
+              {selectedPecera && (
+                <div className="mb-4">
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Densidad del acuario</span>
+                    <span
+                      className={`font-mono font-medium ${
+                        densityPercent >= 90
+                          ? 'text-coral'
+                          : densityPercent >= 70
+                          ? 'text-sand'
+                          : 'text-teal'
+                      }`}
+                    >
+                      {Math.round(densityPercent)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        densityPercent >= 90
+                          ? 'bg-coral'
+                          : densityPercent >= 70
+                          ? 'bg-sand'
+                          : 'bg-teal'
+                      }`}
+                      style={{ width: `${densityPercent}%` }}
+                    />
+                  </div>
+                  {densityPercent >= 90 && (
+                    <p className="mt-1.5 text-xs text-coral">
+                      Capacidad crítica — considera una pecera más grande o reducir peces.
+                    </p>
+                  )}
+                  {densityPercent >= 70 && densityPercent < 90 && (
+                    <p className="mt-1.5 text-xs text-sand">
+                      Acercándose al límite recomendado de densidad.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-2">
+                {availableFish.map(fish => {
+                  const qty = state.fishQuantities[fish.id] ?? 0
+                  const isIncompatible = incompatibleFishIds.has(fish.id)
+                  return (
+                    <FishCard
+                      key={fish.id}
+                      fish={fish}
+                      qty={qty}
+                      isIncompatible={isIncompatible}
+                      onAdd={() => handleFishQty(fish.id, 1)}
+                      onRemove={() => handleFishQty(fish.id, -1)}
+                    />
+                  )
+                })}
+              </div>
+            </StepSection>
+            {/* Vista previa */}
+            <VistaPecera3D
+              waterType={state.waterType}
+              peceraId={state.selectedPeceraId}
+              filtroId={state.selectedFiltroId}
+              fishQuantities={state.fishQuantities}
+            />
+          </div>
+
+          {/* Sidebar column */}
+          <div className="sticky top-4 self-start">
+            <ResumenSidebar
+              state={state}
+              total={total}
+              litrosUsados={litrosUsados}
+              totalPeces={totalPeces}
+              onRemoveWaterType={handleRemoveWaterType}
+              onRemovePecera={handleRemovePecera}
+              onRemoveFiltro={handleRemoveFiltro}
+              onRemoveFish={handleRemoveFish}
+              onClear={handleClear}
+              onSaveDraft={handleSaveDraft}
+              onLoadDraft={handleLoadDraft}
+              onClearDraft={handleClearDraft}
+              onPrint={handlePrint}
+              hasDraft={hasDraft}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -379,11 +549,13 @@ function FiltroCard({
   filtro,
   selected,
   compatible,
+  litrosPecera,
   onClick,
 }: {
   filtro: Filtro
   selected: boolean
   compatible: boolean
+  litrosPecera: number | null  
   onClick: () => void
 }) {
   const rangeLabel =
@@ -418,10 +590,23 @@ function FiltroCard({
       >
         {compatible ? 'Compatible' : 'Incompatible'}
       </span>
-      <div className="mb-0.5 text-sm font-medium text-foreground">{filtro.name}</div>
+
+      <div className="mb-0.5 text-sm font-medium text-foreground">
+        {filtro.name}</div>
+
+      {!compatible && litrosPecera !== null && (
+        <p className="mb-2 text-xs text-destructive">
+          Requiere una pecera entre {filtro.minLitros}L y{' '}
+          {filtro.maxLitros === Infinity
+            ? 'más litros'
+            : `${filtro.maxLitros}L`}
+        </p>
+      )}
+
       <div className="mt-0.5 text-xs text-muted-foreground">
         {filtro.tipo} · {rangeLabel}
       </div>
+
       <div className="mt-2 font-mono text-sm font-medium text-primary">
         {formatColones(filtro.price)}
       </div>
