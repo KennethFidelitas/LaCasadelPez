@@ -3,7 +3,7 @@ import { requireAdminUser } from '@/lib/auth/session'
 import { getCustomerContacts } from '@/lib/customers/data'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 import { getPosCatalog, getSalesDashboardData } from '@/lib/pos/data'
-import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
+import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
 
 export default async function DashboardPage() {
   const { user } = await requireAdminUser('/dashboard')
@@ -22,6 +22,8 @@ export default async function DashboardPage() {
     onlineSalesToday: 0,
     pendingOrders: 0,
   }
+  let topProducts: PosTopProduct[] = []
+  let returnRequests: PosReturnRequest[] = []
 
   try {
     posCatalog = await getPosCatalog()
@@ -34,6 +36,8 @@ export default async function DashboardPage() {
     const salesData = await getSalesDashboardData()
     sales = salesData.sales
     salesSummary = salesData.summary
+    topProducts = salesData.topProducts
+    returnRequests = salesData.returnRequests
   } catch (error) {
     salesError =
       error instanceof Error ? error.message : 'No se pudo cargar el historial de ventas.'
@@ -54,6 +58,8 @@ export default async function DashboardPage() {
       sales={sales}
       salesError={salesError}
       salesSummary={salesSummary}
+      topProducts={topProducts}
+      returnRequests={returnRequests}
       customers={customers}
       customersError={customersError}
     />

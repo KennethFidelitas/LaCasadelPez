@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
+import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from './types'
 
 export async function getPosCatalog(): Promise<PosCatalogProduct[]> {
   const supabase = createClient(
@@ -97,6 +97,8 @@ function isSameLocalDay(dateValue: string): boolean {
 export async function getSalesDashboardData(): Promise<{
   sales: PosSaleRecord[]
   summary: PosSalesSummary
+  topProducts: PosTopProduct[]
+  returnRequests: PosReturnRequest[]
 }> {
   const supabase = await createServerClient()
 
@@ -104,7 +106,7 @@ export async function getSalesDashboardData(): Promise<{
     await Promise.all([
       supabase
         .from('orders')
-        .select('id, order_number, total, status, payment_status, source, created_at')
+        .select('id, order_number, total, status, payment_status, source, created_at, notes')
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
@@ -122,11 +124,47 @@ export async function getSalesDashboardData(): Promise<{
     throw new Error(transactionsError.message)
   }
 
+  const { data: orderItems, error: orderItemsError } = await supabase
+    .from('order_items')
+    .select('product_id, name, sku, quantity, total')
+    .not('product_id', 'is', null)
+
+  if (orderItemsError) {
+    throw new Error(orderItemsError.message)
+  }
+
   const transactionByOrderId = new Map(
     (transactions ?? [])
       .filter((transaction) => transaction.order_id)
       .map((transaction) => [transaction.order_id as string, transaction]),
   )
+
+  const topProductsMap = new Map<string, PosTopProduct>()
+  for (const item of (orderItems ?? []) as Array<{
+    product_id: string | null
+    name: string | null
+    sku: string | null
+    quantity: number | null
+    total: number | null
+  }>) {
+    if (!item.product_id) continue
+
+    const current = topProductsMap.get(item.product_id) ?? {
+      productId: item.product_id,
+      name: item.name ?? 'Producto desconocido',
+      sku: item.sku ?? 'SIN-SKU',
+      soldQuantity: 0,
+      revenue: 0,
+    }
+
+    current.soldQuantity += Number(item.quantity ?? 0)
+    current.revenue += Number(item.total ?? 0)
+    topProductsMap.set(item.product_id, current)
+  }
+
+  const topProducts = Array.from(topProductsMap.values())
+    .sort((a, b) => b.soldQuantity - a.soldQuantity)
+    .slice(0, 8)
 
   const sales = (orders ?? []).map((order) => {
     const transaction = transactionByOrderId.get(order.id)
@@ -152,6 +190,40 @@ export async function getSalesDashboardData(): Promise<{
     } satisfies PosSaleRecord
   })
 
+  const returnRequests = (orders ?? [])
+    .filter(
+      (order) =>
+        order.status === 'cancelado' ||
+        order.status === 'reembolsado' ||
+        order.payment_status === 'reembolsado',
+    )
+    .map((order) => {
+      const transaction = transactionByOrderId.get(order.id)
+      const channel = mapOrderChannel(order.source)
+      const requestStatus: PosReturnRequest['requestStatus'] =
+        order.payment_status === 'reembolsado' || order.status === 'reembolsado'
+          ? 'Aprobada'
+          : 'Pendiente'
+
+      return {
+        id: order.id,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        customer:
+          transaction?.customer_name ||
+          (channel === 'POS'
+            ? 'Cliente de mostrador'
+            : channel === 'Telefono'
+              ? 'Pedido telefonico'
+              : 'Cliente tienda en linea'),
+        requestedAt: order.created_at,
+        requestStatus: requestStatus as PosReturnRequest['requestStatus'],
+        paymentStatus: mapPaymentStatus(order.payment_status),
+        refundAmount: Number(order.total ?? 0),
+        notes: order.notes ?? null,
+      }
+    }) as PosReturnRequest[]
+
   const todaysSales = sales.filter(
     (sale) => isSameLocalDay(sale.createdAt) && sale.paymentStatus === 'Pagado' && sale.status !== 'Cancelado',
   )
@@ -172,5 +244,7 @@ export async function getSalesDashboardData(): Promise<{
       onlineSalesToday,
       pendingOrders,
     },
+    topProducts,
+    returnRequests,
   }
 }
