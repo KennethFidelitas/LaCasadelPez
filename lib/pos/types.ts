@@ -20,6 +20,26 @@ export interface PosSaleRecord {
   transactionNumber: string | null
 }
 
+export interface PosTopProduct {
+  productId: string
+  name: string
+  sku: string
+  soldQuantity: number
+  revenue: number
+}
+
+export interface PosReturnRequest {
+  id: string
+  orderId: string
+  orderNumber: string
+  customer: string
+  requestedAt: string
+  requestStatus: 'Pendiente' | 'Aprobada' | 'Rechazada'
+  paymentStatus: 'Pendiente' | 'Pagado' | 'Fallido' | 'Reembolsado'
+  refundAmount: number
+  notes: string | null
+}
+
 export interface PosSalesSummary {
   totalSalesToday: number
   transactionsToday: number
