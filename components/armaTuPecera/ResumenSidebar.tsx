@@ -1,18 +1,20 @@
 'use client'
 
 import { X, Printer, ShoppingCart, Trash2, Bookmark, Droplets, Fish } from 'lucide-react'
-import { PECERAS, FILTROS, PECES, formatColones } from './data'
+import { ACCESORIOS_OPCIONALES, FILTROS, ILUMINACIONES, PECERAS, PECERAS_PREDISENO, PECES, formatColones } from './data'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/overlays/dialog'
-import type { ArmaTuPeceraState } from './types'
+import type { ArmaTuPeceraStateExtended } from './types'
 
 interface ResumenSidebarProps {
-  state: ArmaTuPeceraState
+  state: ArmaTuPeceraStateExtended
   total: number
   litrosUsados: number
   totalPeces: number
   onRemoveWaterType: () => void
   onRemovePecera: () => void
   onRemoveFiltro: () => void
+  onRemoveIluminacion: () => void
+  onRemoveAccesorio: (accesorioId: string) => void
   onRemoveFish: (fishId: string) => void
   onClear: () => void
   onSaveDraft: () => void
@@ -30,6 +32,8 @@ export function ResumenSidebar({
   onRemoveWaterType,
   onRemovePecera,
   onRemoveFiltro,
+  onRemoveIluminacion,
+  onRemoveAccesorio,
   onRemoveFish,
   onClear,
   onSaveDraft,
@@ -39,7 +43,11 @@ export function ResumenSidebar({
   hasDraft,
 }: ResumenSidebarProps) {
   const selectedPecera = PECERAS.find(p => p.id === state.selectedPeceraId) ?? null
+  const selectedPrediseno = PECERAS_PREDISENO.find(p => p.id === state.selectedPeceraId) ?? null
   const selectedFiltro = FILTROS.find(f => f.id === state.selectedFiltroId) ?? null
+  const selectedIluminacion = ILUMINACIONES.find(l => l.id === state.selectedIluminacionId) ?? null
+  const accesoriosActivos = ACCESORIOS_OPCIONALES.filter(a => state.accesoriosSeleccionados[a.id])
+  const selectedAquarium = selectedPrediseno ?? selectedPecera
   const fishInCart = Object.entries(state.fishQuantities)
     .filter(([, qty]) => qty > 0)
     .map(([id, qty]) => ({ fish: PECES.find(f => f.id === id)!, qty }))
@@ -58,11 +66,11 @@ export function ResumenSidebar({
 
         <div className="p-4">
         {/* Capacity info */}
-        {selectedPecera && (
+        {selectedAquarium && (
           <div className="mb-4 flex items-center justify-between rounded-lg bg-secondary px-3 py-2">
             <div className="flex items-center gap-1.5 text-xs text-foreground/70">
               <Droplets className="h-3.5 w-3.5" />
-              <span className="font-mono">{litrosUsados}L / {selectedPecera.litros}L</span>
+              <span className="font-mono">{litrosUsados}L / {selectedAquarium.litros}L</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-foreground/70">
               <Fish className="h-3.5 w-3.5" />
@@ -84,11 +92,11 @@ export function ResumenSidebar({
           )}
 
           {/* Pecera */}
-          {selectedPecera && (
+          {selectedAquarium && (
             <SidebarItem
-              label={selectedPecera.name}
-              price={selectedPecera.price}
-              icon={selectedPecera.image ? '🐠' : '🐟'}
+              label={selectedPrediseno ? `Kit: ${selectedPrediseno.name}` : selectedAquarium.name}
+              price={selectedAquarium.price}
+              icon={selectedPrediseno ? '📦' : selectedAquarium.image ? '🐠' : '🐟'}
               onRemove={onRemovePecera}
             />
           )}
@@ -102,6 +110,25 @@ export function ResumenSidebar({
               onRemove={onRemoveFiltro}
             />
           )}
+
+          {selectedIluminacion && (
+            <SidebarItem
+              label={selectedIluminacion.name}
+              price={selectedIluminacion.price}
+              icon="💡"
+              onRemove={onRemoveIluminacion}
+            />
+          )}
+
+          {accesoriosActivos.map(accesorio => (
+            <SidebarItem
+              key={accesorio.id}
+              label={accesorio.name}
+              price={accesorio.price}
+              icon="➕"
+              onRemove={() => onRemoveAccesorio(accesorio.id)}
+            />
+          ))}
 
           {/* Peces */}
           {fishInCart.map(({ fish, qty }) => (
@@ -229,16 +256,20 @@ export function ResumenSidebar({
               <span>{state.waterType === 'salada' ? 'Agua Salada' : state.waterType === 'dulce' ? 'Agua Dulce' : 'No seleccionada'}</span>
             </div>
             <div className="flex justify-between">
-              <span>Pecera</span>
-              <span>{selectedPecera?.name ?? 'No seleccionada'}</span>
+              <span>{selectedPrediseno ? 'Kit' : 'Pecera'}</span>
+              <span>{selectedAquarium?.name ?? 'No seleccionada'}</span>
             </div>
             <div className="flex justify-between">
               <span>Filtro</span>
-              <span>{selectedFiltro?.name ?? 'No seleccionado'}</span>
+              <span>{selectedPrediseno ? 'Incluido en el kit' : selectedFiltro?.name ?? 'No seleccionado'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Iluminación</span>
+              <span>{selectedIluminacion?.name ?? 'No seleccionada'}</span>
             </div>
             <div className="flex justify-between">
               <span>Litros usados</span>
-              <span>{selectedPecera ? `${litrosUsados}L / ${selectedPecera.litros}L` : '—'}</span>
+              <span>{selectedAquarium ? `${litrosUsados}L / ${selectedAquarium.litros}L` : '—'}</span>
             </div>
             <div className="flex justify-between">
               <span>Total de peces</span>
@@ -260,10 +291,10 @@ export function ResumenSidebar({
                 <span className="font-mono">—</span>
               </li>
             )}
-            {selectedPecera && (
+            {selectedAquarium && (
               <li className="flex justify-between rounded-md bg-secondary/60 p-3">
-                <span>{selectedPecera.name}</span>
-                <span className="font-mono">{formatColones(selectedPecera.price)}</span>
+                <span>{selectedPrediseno ? `Kit: ${selectedPrediseno.name}` : selectedAquarium.name}</span>
+                <span className="font-mono">{formatColones(selectedAquarium.price)}</span>
               </li>
             )}
             {selectedFiltro && (
@@ -272,6 +303,18 @@ export function ResumenSidebar({
                 <span className="font-mono">{formatColones(selectedFiltro.price)}</span>
               </li>
             )}
+            {selectedIluminacion && (
+              <li className="flex justify-between rounded-md bg-secondary/60 p-3">
+                <span>{selectedIluminacion.name}</span>
+                <span className="font-mono">{formatColones(selectedIluminacion.price)}</span>
+              </li>
+            )}
+            {accesoriosActivos.map(accesorio => (
+              <li key={accesorio.id} className="flex justify-between rounded-md bg-secondary/60 p-3">
+                <span>{accesorio.name}</span>
+                <span className="font-mono">{formatColones(accesorio.price)}</span>
+              </li>
+            ))}
             {fishInCart.length > 0 ? (
               fishInCart.map(({ fish, qty }) => (
                 <li key={fish.id} className="flex justify-between rounded-md bg-secondary/60 p-3">
