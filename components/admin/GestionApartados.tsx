@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle, Bell, CheckCircle, Loader2, Printer, Search,
-  XCircle, Clock, Package,
+  XCircle, Clock, Package, DollarSign, PackageCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
@@ -21,9 +21,10 @@ import { Input } from '@/components/ui/forms/input'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import {
-  type Apartado, type ApartadoAlert, type ApartadoStatus,
+  type Apartado, type ApartadoAlert, type ApartadoStatus, type ApartadoPaymentMethod,
   APARTADO_STATUS_LABELS, ALERT_TYPE_LABELS, ALERT_URGENCY,
   listarApartados, listarAlertasPendientes, cancelarApartado, resolverAlerta,
+  registrarPagoApartado, confirmarPagoApartado, generarAlertasVencimiento,
 } from '@/lib/apartados/actions'
 import { formatPrice, formatDate } from '@/lib/format'
 
@@ -40,6 +41,8 @@ export function GestionApartados({ adminUserId }: { adminUserId: string }) {
   async function cargar() {
     setLoading(true)
     try {
+      // Genera al vuelo las alertas de vencimiento pendientes antes de listarlas.
+      await generarAlertasVencimiento().catch(e => console.error(e))
       const [apt, alt] = await Promise.all([
         listarApartados({ buscar: buscar || undefined, status: filtroStatus || undefined }),
         listarAlertasPendientes(),
@@ -222,6 +225,7 @@ function ApartadoRow({
   onCancelled: () => void
 }) {
   const isActive = apartado.status === 'activo'
+  const canFinalize = isActive && apartado.balance <= 0
   const daysLeft = Math.ceil(
     (new Date(apartado.expires_at).getTime() - Date.now()) / 86400000,
   )
@@ -274,6 +278,21 @@ function ApartadoRow({
           >
             <Printer className="h-3.5 w-3.5" />
           </Button>
+          {/* Registrar pago parcial */}
+          {isActive && apartado.balance > 0 && (
+            <RegistrarPagoDialog
+              apartado={apartado}
+              adminUserId={adminUserId}
+              onPaid={onCancelled}
+            />
+          )}
+          {/* Finalizar (pago completo) */}
+          {canFinalize && (
+            <FinalizarApartadoButton
+              apartado={apartado}
+              onFinalized={onCancelled}
+            />
+          )}
           {/* Cancelar apartado */}
           {isActive && (
             <CancelarApartadoDialog
@@ -285,6 +304,160 @@ function ApartadoRow({
         </div>
       </TableCell>
     </TableRow>
+  )
+}
+
+// ─── Dialog de registro de pago ───────────────────────────────────────────────
+
+function RegistrarPagoDialog({
+  apartado, adminUserId, onPaid,
+}: {
+  apartado: Apartado
+  adminUserId: string
+  onPaid: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<ApartadoPaymentMethod>('efectivo')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  const amountNumber = Number(amount) || 0
+
+  async function handleSubmit() {
+    if (amountNumber <= 0) { setError('Ingresá un monto válido.'); return }
+    if (amountNumber > apartado.balance) { setError('El abono no puede ser mayor al saldo pendiente.'); return }
+
+    setLoading(true)
+    setError(null)
+    const { error: err } = await registrarPagoApartado(
+      apartado.id, amountNumber, paymentMethod, adminUserId, notes || undefined,
+    )
+    setLoading(false)
+    if (err) { setError(err); return }
+    setSuccess(true)
+    onPaid()
+    setTimeout(() => { setSuccess(false); setOpen(false) }, 1200)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setAmount(''); setNotes(''); setError(null); setSuccess(false) } }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <DollarSign className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Registrar pago</DialogTitle>
+          <DialogDescription>
+            Apartado #{apartado.apartado_number} · {apartado.customer_name}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="rounded-lg border p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Pagado hasta ahora</span>
+              <span className="font-medium text-green-600">{formatPrice(apartado.deposit_amount)}</span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-muted-foreground">Saldo pendiente</span>
+              <span className="font-semibold">{formatPrice(apartado.balance)}</span>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Monto del abono *</label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Método de pago</label>
+            <div className="grid grid-cols-4 gap-1">
+              {(['efectivo', 'tarjeta', 'credito', 'mixto'] as const).map(m => (
+                <Button
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={paymentMethod === m ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod(m)}
+                  className="capitalize"
+                >
+                  {m}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Notas</label>
+            <Textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Referencia, número de comprobante, etc. (opcional)"
+              rows={2}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-destructive">
+              <XCircle className="h-4 w-4 shrink-0" />
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-green-700">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              <p className="text-sm">Pago registrado.</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>Cerrar</Button>
+          <Button onClick={handleSubmit} disabled={loading || amountNumber <= 0}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Registrar pago'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Botón de finalizar (pago completo -> entrega) ────────────────────────────
+
+function FinalizarApartadoButton({
+  apartado, onFinalized,
+}: {
+  apartado: Apartado
+  onFinalized: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+
+  async function handleFinalize() {
+    setLoading(true)
+    try {
+      await confirmarPagoApartado(apartado.id)
+      onFinalized()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Button size="sm" onClick={handleFinalize} disabled={loading} title="Marcar como pagado y listo para entrega">
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
+    </Button>
   )
 }
 

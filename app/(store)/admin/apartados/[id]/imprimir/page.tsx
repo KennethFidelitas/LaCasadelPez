@@ -2,9 +2,10 @@
 
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { formatPrice, formatDate, formatOrderNumber } from '@/lib/format'
+import { formatPrice, formatDate } from '@/lib/format'
 import { APARTADO_STATUS_LABELS } from '@/lib/apartados/actions'
 import type { Apartado } from '@/lib/apartados/actions'
+import { PrintButton } from './print-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -52,12 +53,7 @@ export default async function ImprimirApartadoPage({ params }: PageProps) {
           <span className="text-sm text-muted-foreground">
             Comprobante de apartado #{apt.apartado_number}
           </span>
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            🖨️ Imprimir
-          </button>
+          <PrintButton />
         </div>
       </div>
 
@@ -117,6 +113,7 @@ export default async function ImprimirApartadoPage({ params }: PageProps) {
           </h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <Fila label="Tipo" value={itemTypeLabel[apt.item_type] ?? apt.item_type} />
+            <Fila label="Cantidad" value={String(apt.quantity)} />
             {apt.item_type.startsWith('pecera') && apt.aquarium_config && (
               <>
                 {(apt.aquarium_config as any).mode === 'prediseno' && (apt.aquarium_config as any).name && (
@@ -151,7 +148,7 @@ export default async function ImprimirApartadoPage({ params }: PageProps) {
             <tbody>
               <FilaPrecio label="Precio total del artículo" valor={apt.total_price} />
               <tr><td colSpan={2}><hr className="my-1 border-border" /></td></tr>
-              <FilaPrecio label="Anticipo cancelado (50%)" valor={apt.deposit_amount} className="text-green-700 font-medium" />
+              <FilaPrecio label="Anticipo cancelado" valor={apt.deposit_amount} className="text-green-700 font-medium" />
               <FilaPrecio
                 label="Saldo pendiente"
                 valor={balance}

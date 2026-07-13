@@ -6,6 +6,7 @@ import {
   Activity,
   Bell,
   Boxes,
+  CalendarClock,
   ChevronRight,
   CreditCard,
   Factory,
@@ -26,9 +27,14 @@ import {
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
+import { GestionApartados } from '@/components/admin/GestionApartados'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/overlays/dialog'
 import { Progress } from '@/components/ui/display/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import { Input } from '@/components/ui/forms/input'
@@ -36,6 +42,7 @@ import { Label } from '@/components/ui/forms/label'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { createCustomerContact } from '@/lib/customers/actions'
 import type { CustomerContactRecord } from '@/lib/customers/types'
+import { crearApartado } from '@/lib/apartados/actions'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { createPosSale } from '@/lib/pos/actions'
 import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
@@ -43,6 +50,7 @@ import type { PosCatalogProduct, PosSaleRecord, PosSalesSummary } from '@/lib/po
 type ModuleKey =
   | 'overview'
   | 'pos'
+  | 'apartados'
   | 'inventory'
   | 'orders'
   | 'production'
@@ -88,6 +96,7 @@ type ProductionItem = {
 const modules = [
   { key: 'overview', label: 'Resumen', icon: LayoutDashboard },
   { key: 'pos', label: 'Punto de venta', icon: CreditCard },
+  { key: 'apartados', label: 'Apartados', icon: CalendarClock },
   { key: 'inventory', label: 'Inventario', icon: Boxes },
   { key: 'orders', label: 'Pedidos', icon: ShoppingCart },
   { key: 'production', label: 'Produccion', icon: Factory },
@@ -117,6 +126,7 @@ const productionQueue: ProductionItem[] = [
 ]
 
 interface AdminDashboardProps {
+  adminUserId: string
   posCatalog: PosProduct[]
   posCatalogError?: string | null
   sales: PosSaleRecord[]
@@ -154,6 +164,7 @@ const initialEmailTemplates: EmailTemplate[] = [
 ]
 
 export function AdminDashboard({
+  adminUserId,
   posCatalog,
   posCatalogError = null,
   sales,
@@ -226,6 +237,14 @@ export function AdminDashboard({
   const [openingCash, setOpeningCash] = useState(120000)
   const [closingCash, setClosingCash] = useState(0)
   const [cashNotes, setCashNotes] = useState("")
+  const [apartarDialogOpen, setApartarDialogOpen] = useState(false)
+  const [apartarCustomerName, setApartarCustomerName] = useState('')
+  const [apartarCustomerPhone, setApartarCustomerPhone] = useState('')
+  const [apartarCustomerEmail, setApartarCustomerEmail] = useState('')
+  const [apartarDeposit, setApartarDeposit] = useState(0)
+  const [apartarDays, setApartarDays] = useState(7)
+  const [apartarError, setApartarError] = useState<string | null>(null)
+  const [isApartando, startApartando] = useTransition()
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [inventarioLoading, setInventarioLoading] = useState(true)
   const [inventorySearch, setInventorySearch] = useState('')
@@ -387,6 +406,55 @@ export function AdminDashboard({
           toast.success(`Venta ${sale.transactionNumber} registrada correctamente`)
         } catch (error) {
           toast.error(error instanceof Error ? error.message : 'No se pudo registrar la venta')
+        }
+      })()
+    })
+  }
+
+  function handleApartarCart() {
+    setApartarError(null)
+
+    if (cartItems.length !== 1) {
+      setApartarError('Apartar solo admite un producto por apartado. Vendé o apartá los demás por separado.')
+      return
+    }
+    if (!apartarCustomerName.trim() || !apartarCustomerPhone.trim()) {
+      setApartarError('Nombre y teléfono del cliente son obligatorios.')
+      return
+    }
+    if (apartarDeposit <= 0 || apartarDeposit > subtotal) {
+      setApartarError('El anticipo debe ser mayor a cero y no puede superar el total.')
+      return
+    }
+
+    const [item] = cartItems
+
+    startApartando(() => {
+      void (async () => {
+        try {
+          await crearApartado({
+            customer_name: apartarCustomerName.trim(),
+            customer_phone: apartarCustomerPhone.trim(),
+            customer_email: apartarCustomerEmail.trim() || undefined,
+            item_type: 'product',
+            product_id: item.id,
+            quantity: item.quantity,
+            total_price: subtotal,
+            deposit_amount: apartarDeposit,
+            expires_days: apartarDays,
+            created_by: adminUserId,
+          })
+
+          setCartItems([])
+          setApartarDialogOpen(false)
+          setApartarCustomerName('')
+          setApartarCustomerPhone('')
+          setApartarCustomerEmail('')
+          setApartarDeposit(0)
+          setApartarDays(7)
+          toast.success('Apartado creado correctamente')
+        } catch (error) {
+          setApartarError(error instanceof Error ? error.message : 'No se pudo crear el apartado')
         }
       })()
     })
@@ -819,7 +887,93 @@ async function sendTestEmail() {
 
                       <div className="rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">Apartado</p>
-                        <p className="mt-1 font-semibold">Disponible para anticipo</p>
+                        <Dialog
+                          open={apartarDialogOpen}
+                          onOpenChange={(open) => { setApartarDialogOpen(open); if (!open) setApartarError(null) }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-1"
+                              disabled={cartItems.length === 0}
+                            >
+                              Apartar con anticipo
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Apartar producto</DialogTitle>
+                              <DialogDescription>
+                                {cartItems.length === 1
+                                  ? `${cartItems[0].name} · Total ${formatPrice(subtotal)}`
+                                  : 'Apartar solo admite un producto por apartado.'}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-2">
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Nombre del cliente *</label>
+                                <Input
+                                  value={apartarCustomerName}
+                                  onChange={(event) => setApartarCustomerName(event.target.value)}
+                                  placeholder="Nombre completo"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Teléfono *</label>
+                                <Input
+                                  value={apartarCustomerPhone}
+                                  onChange={(event) => setApartarCustomerPhone(event.target.value)}
+                                  placeholder="Ej: 8888-8888"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Correo (opcional)</label>
+                                <Input
+                                  type="email"
+                                  value={apartarCustomerEmail}
+                                  onChange={(event) => setApartarCustomerEmail(event.target.value)}
+                                  placeholder="cliente@correo.com"
+                                />
+                              </div>
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-2">
+                                  <label className="text-sm font-medium text-foreground">Anticipo *</label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={apartarDeposit}
+                                    onChange={(event) => setApartarDeposit(Number(event.target.value))}
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <label className="text-sm font-medium text-foreground">Días de vigencia</label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={apartarDays}
+                                    onChange={(event) => setApartarDays(Number(event.target.value))}
+                                  />
+                                </div>
+                              </div>
+                              {apartarError && (
+                                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                                  {apartarError}
+                                </div>
+                              )}
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setApartarDialogOpen(false)} disabled={isApartando}>
+                                Cancelar
+                              </Button>
+                              <Button onClick={handleApartarCart} disabled={isApartando}>
+                                {isApartando ? 'Guardando...' : 'Confirmar apartado'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </div>
 
@@ -994,6 +1148,10 @@ async function sendTestEmail() {
                   </CardContent>
                 </Card>
               </section>
+            )}
+
+            {activeModule === 'apartados' && (
+              <GestionApartados adminUserId={adminUserId} />
             )}
 
             {activeModule === 'inventory' && (
@@ -1681,6 +1839,7 @@ function getModuleTitle(module: ModuleKey) {
   const titles: Record<ModuleKey, string> = {
     overview: 'Centro de administracion',
     pos: 'Punto de venta',
+    apartados: 'Apartados',
     inventory: 'Inventario y catalogo',
     orders: 'Pedidos y operacion e-commerce',
     production: 'Produccion de peceras',
@@ -1697,6 +1856,7 @@ function getModuleDescription(module: ModuleKey) {
   const descriptions: Record<ModuleKey, string> = {
     overview: 'Vista principal del sistema con alertas, prioridades y estado operativo.',
     pos: 'Frontend para caja, carrito del vendedor, descuentos, apartados y pagos.',
+    apartados: 'Crear, consultar, cobrar y cancelar apartados; alertas de vencimiento y comprobantes.',
     inventory: 'Modulo de control de stock, costos, alertas y ajustes manuales.',
     orders: 'Seguimiento de pedidos por canal, estados y cumplimiento.',
     production: 'Tablero de fabricacion y avances de proyectos personalizados.',

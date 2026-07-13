@@ -24,6 +24,7 @@ export interface Apartado {
   item_type: ApartadoItemType
   product_id: string | null
   animal_id: string | null
+  quantity: number
   aquarium_config: Record<string, unknown>
   total_price: number
   deposit_amount: number
@@ -59,12 +60,25 @@ export interface CreateApartadoInput {
   item_type: ApartadoItemType
   product_id?: string
   animal_id?: string
+  quantity?: number        // default: 1
   aquarium_config?: Record<string, unknown>
   total_price: number
   deposit_amount: number
   expires_days?: number   // días hasta vencimiento (default: 7)
   created_by?: string
   notes?: string
+}
+
+export type ApartadoPaymentMethod = 'efectivo' | 'tarjeta' | 'credito' | 'mixto'
+
+export interface ApartadoPayment {
+  id: string
+  apartado_id: string
+  amount: number
+  payment_method: ApartadoPaymentMethod
+  received_by: string | null
+  notes: string | null
+  created_at: string
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
@@ -108,6 +122,7 @@ export async function crearApartado(input: CreateApartadoInput): Promise<Apartad
       item_type: input.item_type,
       product_id: input.product_id ?? null,
       animal_id: input.animal_id ?? null,
+      quantity: input.quantity ?? 1,
       aquarium_config: input.aquarium_config ?? {},
       total_price: input.total_price,
       deposit_amount: input.deposit_amount,
@@ -119,29 +134,10 @@ export async function crearApartado(input: CreateApartadoInput): Promise<Apartad
     .select()
     .single()
 
+  // El trigger reserve_inventory_for_apartado (AFTER INSERT, con bloqueo de fila)
+  // descuenta el inventario de forma atómica y lanza una excepción si no hay
+  // stock suficiente, que Supabase devuelve acá como `error`.
   if (error) throw new Error(error.message)
-
-  // Descontar 1 del inventario si es producto o animal específico
-  if (input.product_id) {
-    await supabase
-      .from('inventory')
-      .update({ quantity: supabase.rpc('greatest', { a: 0, b: -1 }) })
-      .eq('product_id', input.product_id)
-  }
-  if (input.animal_id) {
-    const { data: inv } = await supabase
-      .from('inventory')
-      .select('id, quantity')
-      .eq('animal_id', input.animal_id)
-      .single()
-
-    if (inv && inv.quantity > 0) {
-      await supabase
-        .from('inventory')
-        .update({ quantity: inv.quantity - 1, updated_at: new Date().toISOString() })
-        .eq('id', inv.id)
-    }
-  }
 
   revalidatePath('/admin')
   return data as Apartado
@@ -186,6 +182,72 @@ export async function cancelarApartado(
 
   revalidatePath('/admin')
   return { error: null }
+}
+
+// ─── Registrar pago parcial (abono al anticipo) ────────────────────────────────
+
+export async function registrarPagoApartado(
+  apartadoId: string,
+  amount: number,
+  paymentMethod: ApartadoPaymentMethod,
+  receivedBy: string,
+  notes?: string,
+): Promise<{ error: string | null; balance: number | null; status: ApartadoStatus | null }> {
+  const supabase = createAdminClient()
+
+  if (amount <= 0) {
+    return { error: 'El monto del abono debe ser mayor a cero.', balance: null, status: null }
+  }
+
+  const { data: apartado, error: fetchError } = await supabase
+    .from('apartados')
+    .select('id, status, total_price, deposit_amount, balance')
+    .eq('id', apartadoId)
+    .single()
+
+  if (fetchError || !apartado) {
+    return { error: 'Apartado no encontrado.', balance: null, status: null }
+  }
+
+  if (apartado.status !== 'activo') {
+    return {
+      error: `El apartado ya está en estado "${APARTADO_STATUS_LABELS[apartado.status as ApartadoStatus]}".`,
+      balance: null,
+      status: null,
+    }
+  }
+
+  if (amount > apartado.balance) {
+    return { error: 'El abono no puede ser mayor al saldo pendiente.', balance: null, status: null }
+  }
+
+  const { error: paymentError } = await supabase.from('apartado_payments').insert({
+    apartado_id: apartadoId,
+    amount,
+    payment_method: paymentMethod,
+    received_by: receivedBy,
+    notes: notes ?? null,
+  })
+
+  if (paymentError) {
+    return { error: paymentError.message, balance: null, status: null }
+  }
+
+  const newDepositAmount = Number(apartado.deposit_amount) + amount
+  const newBalance = Number(apartado.total_price) - newDepositAmount
+  const newStatus: ApartadoStatus = newBalance <= 0 ? 'pagado' : 'activo'
+
+  const { error: updateError } = await supabase
+    .from('apartados')
+    .update({ deposit_amount: newDepositAmount, status: newStatus })
+    .eq('id', apartadoId)
+
+  if (updateError) {
+    return { error: updateError.message, balance: null, status: null }
+  }
+
+  revalidatePath('/admin')
+  return { error: null, balance: Math.max(newBalance, 0), status: newStatus }
 }
 
 // ─── Confirmar pago completo (activa la creación de production_order) ─────────
