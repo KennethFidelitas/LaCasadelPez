@@ -19,6 +19,7 @@ export const PECERAS: Pecera[] = [
     litros: 60,
     dimensions: '60 × 35 × 35 cm',
     price: 35000,
+    image: 'pecera_60.jpg',
   },
   {
     id: 'mediana-120',
@@ -26,6 +27,7 @@ export const PECERAS: Pecera[] = [
     litros: 120,
     dimensions: '90 × 40 × 40 cm',
     price: 65000,
+    image: 'pecera_120.png',
   },
   {
     id: 'grande-200',
@@ -33,6 +35,7 @@ export const PECERAS: Pecera[] = [
     litros: 200,
     dimensions: '120 × 50 × 40 cm',
     price: 95000,
+    image: 'pecera_grande_200.jpg',
   },
   {
     id: 'xl-300',
@@ -40,6 +43,7 @@ export const PECERAS: Pecera[] = [
     litros: 300,
     dimensions: '150 × 60 × 45 cm',
     price: 150000,
+    image: 'pecera_XL_300.jpg',
   },
 ]
 
@@ -60,6 +64,7 @@ export const FILTROS: Filtro[] = [
     minLitros: 20,
     maxLitros: 80,
     price: 14500,
+    image: 'filtro-interno.png',
   },
   {
     id: 'externo-m',
@@ -68,6 +73,7 @@ export const FILTROS: Filtro[] = [
     minLitros: 60,
     maxLitros: 150,
     price: 28000,
+    image: 'filtro-externo.png',
   },
   {
     id: 'externo-l',
@@ -76,6 +82,7 @@ export const FILTROS: Filtro[] = [
     minLitros: 120,
     maxLitros: 250,
     price: 45000,
+    image: 'filtro-externo-L.png',
   },
   {
     id: 'sump',
@@ -84,6 +91,7 @@ export const FILTROS: Filtro[] = [
     minLitros: 200,
     maxLitros: Infinity,
     price: 75000,
+    image: 'filtro-sump.png',
   },
 ]
 
@@ -98,6 +106,7 @@ export const PECES: Fish[] = [
     price: 3500,
     description: 'Pez de cola larga y colores vibrantes. Muy territorial, debe vivir solo.',
     incompatibleWith: ['guppy', 'neon-tetra', 'angel'],
+    image: 'Betta.png',
   },
   {
     id: 'neon-tetra',
@@ -108,6 +117,7 @@ export const PECES: Fish[] = [
     price: 800,
     description: 'Pequeño pez de banco con franja azul y roja. Ideal en grupos.',
     incompatibleWith: ['betta', 'angel', 'oscar'],
+    image: 'Neon Tetra.png',
   },
   {
     id: 'guppy',
@@ -129,6 +139,7 @@ export const PECES: Fish[] = [
     price: 1200,
     description: 'Clásico pez de agua fría. Requiere espacio y buena filtración.',
     incompatibleWith: ['betta', 'oscar', 'angel'],
+    image: 'goldfish.png',
   },
   {
     id: 'angel',
@@ -139,6 +150,7 @@ export const PECES: Fish[] = [
     price: 2500,
     description: 'Elegante pez triangular. Puede perseguir peces pequeños.',
     incompatibleWith: ['neon-tetra', 'guppy', 'goldfish', 'betta'],
+    image: 'angel.png',
   },
   {
     id: 'pleco',
@@ -149,6 +161,7 @@ export const PECES: Fish[] = [
     price: 2000,
     description: 'Limpiador natural del acuario. Se alimenta de algas en el fondo.',
     incompatibleWith: [],
+    image: 'pleco.png',
   },
   {
     id: 'corydoras',
@@ -159,6 +172,7 @@ export const PECES: Fish[] = [
     price: 900,
     description: 'Pequeño pez de fondo muy social, vive mejor en grupos de 4+.',
     incompatibleWith: ['oscar'],
+    image: 'corydoras.png',
   },
   {
     id: 'oscar',
@@ -169,6 +183,7 @@ export const PECES: Fish[] = [
     price: 4500,
     description: 'Pez grande y territorial. Requiere pecera amplia y pocos compañeros.',
     incompatibleWith: ['neon-tetra', 'guppy', 'corydoras', 'angel', 'goldfish'],
+    image: 'oscar.png',
   },
 
   // --- AGUA SALADA ---
@@ -181,6 +196,7 @@ export const PECES: Fish[] = [
     price: 8500,
     description: 'Icónico pez naranja y blanco. Vive en simbiosis con anémonas.',
     incompatibleWith: ['damsel', 'lionfish'],
+    image: 'clownfish.png',
   },
   {
     id: 'damsel',
@@ -191,6 +207,7 @@ export const PECES: Fish[] = [
     price: 4500,
     description: 'Brillante azul eléctrico. Muy territorial con sus congéneres.',
     incompatibleWith: ['clownfish', 'marine-angel', 'neon-goby', 'chromis'],
+    image: 'damsel.png',
   },
   {
     id: 'marine-angel',
@@ -201,6 +218,7 @@ export const PECES: Fish[] = [
     price: 12000,
     description: 'Espectacular pez con franjas de colores. Necesita espacio y escondites.',
     incompatibleWith: ['damsel'],
+    image: 'marine-angel.png',
   },
   {
     id: 'tang',
@@ -211,6 +229,7 @@ export const PECES: Fish[] = [
     price: 15000,
     description: 'El famoso pez de aleta caudal amarilla. Necesita nadar mucho.',
     incompatibleWith: [],
+    image: 'tang.png',
   },
   {
     id: 'neon-goby',
@@ -221,6 +240,7 @@ export const PECES: Fish[] = [
     price: 3500,
     description: 'Pequeño limpiador con franja azul fluorescente. Muy activo.',
     incompatibleWith: ['damsel', 'lionfish'],
+    image: 'neon-goby.png',
   },
   {
     id: 'mandarin',
@@ -231,6 +251,7 @@ export const PECES: Fish[] = [
     price: 9000,
     description: 'Uno de los peces más coloridos del mundo. Dieta especializada.',
     incompatibleWith: ['lionfish'],
+    image: 'mandarin.png',
   },
   {
     id: 'lionfish',
@@ -241,6 +262,7 @@ export const PECES: Fish[] = [
     price: 18000,
     description: 'Depredador de espinas venenosas. Solo puede coexistir con peces grandes.',
     incompatibleWith: ['clownfish', 'neon-goby', 'mandarin', 'chromis', 'damsel'],
+    image: 'lionfish.png',
   },
   {
     id: 'chromis',
@@ -251,5 +273,188 @@ export const PECES: Fish[] = [
     price: 2500,
     description: 'Pez de banco resistente y activo. Excelente para acuarios de arrecife.',
     incompatibleWith: ['lionfish', 'damsel'],
+    image: 'chromis.png',
+  },
+]
+
+// ─── Datos de iluminación ────────────────────────────────────────────────────
+
+import type { Iluminacion, AccesorioOpcional, PeceraPrediseno } from './types'
+
+export const ILUMINACIONES: Iluminacion[] = [
+  {
+    id: 'luz-basica',
+    name: 'Luz Básica LED',
+    tipo: 'LED',
+    potencia: '10W',
+    cobertura: 'hasta 40 cm',
+    minLitros: 0,
+    maxLitros: 30,
+    price: 7500,
+    descripcion: 'Iluminación LED de entrada para peceras nano. Bajo consumo.',
+  },
+  {
+    id: 'luz-media',
+    name: 'LED Full Spectrum',
+    tipo: 'LED',
+    potencia: '24W',
+    cobertura: '40–80 cm',
+    minLitros: 20,
+    maxLitros: 100,
+    price: 18500,
+    descripcion: 'Espectro completo ideal para plantas y corales de bajo requerimiento.',
+  },
+  {
+    id: 'luz-planted',
+    name: 'LED Planted Plus',
+    tipo: 'LED',
+    potencia: '45W',
+    cobertura: '60–120 cm',
+    minLitros: 60,
+    maxLitros: 200,
+    price: 32000,
+    descripcion: 'Alta intensidad para plantas exigentes y acuarios plantados densos.',
+  },
+  {
+    id: 'luz-reef',
+    name: 'LED Reef Pro',
+    tipo: 'LED',
+    potencia: '90W',
+    cobertura: '80–150 cm',
+    minLitros: 100,
+    maxLitros: 350,
+    price: 65000,
+    descripcion: 'Control de espectro por canal. Ideal para acuarios de arrecife con corales SPS.',
+  },
+  {
+    id: 'luz-t5',
+    name: 'T5 HO Doble',
+    tipo: 'T5',
+    potencia: '2×39W',
+    cobertura: '60–120 cm',
+    minLitros: 60,
+    maxLitros: 250,
+    price: 28000,
+    descripcion: 'Fluorescente T5 de alta salida. Buena penetración y color natural.',
+  },
+]
+
+// ─── Datos de accesorios opcionales ─────────────────────────────────────────
+
+export const ACCESORIOS_OPCIONALES: AccesorioOpcional[] = [
+  {
+    id: 'calentador',
+    name: 'Calentador 150W',
+    categoria: 'calefaccion',
+    price: 12500,
+    descripcion: 'Termocalentador sumergible con termostato ajustable. Para hasta 150L.',
+  },
+  {
+    id: 'calentador-xl',
+    name: 'Calentador 300W',
+    categoria: 'calefaccion',
+    price: 18000,
+    descripcion: 'Para peceras de 150–300L. Con protección contra encendido en seco.',
+  },
+  {
+    id: 'co2-kit',
+    name: 'Kit CO₂ Básico',
+    categoria: 'co2',
+    price: 35000,
+    descripcion: 'Sistema de CO₂ con botella recargable, regulador y difusor. Para plantas.',
+  },
+  {
+    id: 'sustrato-planted',
+    name: 'Sustrato Plantado',
+    categoria: 'sustrato',
+    price: 15000,
+    descripcion: 'Sustrato nutritivo activo para acuarios plantados. Bolsa de 9 kg.',
+  },
+  {
+    id: 'sustrato-marino',
+    name: 'Arena Marina',
+    categoria: 'sustrato',
+    price: 12000,
+    descripcion: 'Arena coralina de grano fino para acuarios de agua salada. 10 kg.',
+  },
+  {
+    id: 'tapa',
+    name: 'Tapa de Vidrio',
+    categoria: 'proteccion',
+    price: 8500,
+    descripcion: 'Tapa de vidrio templado con bisagra. Reduce evaporación y protege los peces.',
+  },
+  {
+    id: 'termometro',
+    name: 'Termómetro Digital',
+    categoria: 'monitoreo',
+    price: 3500,
+    descripcion: 'Termómetro LCD con sonda sumergible. Precisión ±0.1°C.',
+  },
+  {
+    id: 'red-peces',
+    name: 'Set de Redes',
+    categoria: 'mantenimiento',
+    price: 2500,
+    descripcion: 'Set de 3 redes de diferentes tamaños para manejo de peces.',
+  },
+  {
+    id: 'sifon',
+    name: 'Sifón Limpiafondo',
+    categoria: 'mantenimiento',
+    price: 4500,
+    descripcion: 'Sifón de limpieza de fondo con manguera de 1.5 m. Fácil de usar.',
+  },
+  {
+    id: 'osmoinstalada',
+    name: 'Osmosis Inversa (básica)',
+    categoria: 'tratamiento-agua',
+    price: 55000,
+    descripcion: 'Sistema de purificación de agua. Esencial para agua salada y plantas exigentes.',
+  },
+]
+
+// ─── Peceras prediseñadas ────────────────────────────────────────────────────
+
+export const PECERAS_PREDISENO: PeceraPrediseno[] = [
+  {
+    id: 'starter-dulce',
+    name: 'Starter Agua Dulce',
+    litros: 60,
+    dimensions: '60 × 35 × 35 cm',
+    price: 85000,
+    waterType: ['dulce'],
+    descripcion: 'Kit completo para comenzar en el hobby. Listo para montar.',
+    incluye: ['Pecera 60L', 'Filtro interno', 'Luz LED básica', 'Calentador 150W', 'Sustrato natural', 'Tapa'],
+  },
+  {
+    id: 'planted-tank',
+    name: 'Planted Tank 120L',
+    litros: 120,
+    dimensions: '90 × 40 × 40 cm',
+    price: 185000,
+    waterType: ['dulce'],
+    descripcion: 'Configuración optimizada para acuarios plantados densos con CO₂.',
+    incluye: ['Pecera 120L', 'Filtro externo M', 'LED Planted Plus', 'Kit CO₂', 'Sustrato plantado', 'Calentador 150W'],
+  },
+  {
+    id: 'reef-starter',
+    name: 'Reef Starter 200L',
+    litros: 200,
+    dimensions: '120 × 50 × 40 cm',
+    price: 320000,
+    waterType: ['salada'],
+    descripcion: 'Todo lo necesario para un arrecife de agua salada con corales blandos.',
+    incluye: ['Pecera 200L', 'Sump', 'LED Reef Pro', 'Arena marina', 'Skimmer', 'Bomba de movimiento', 'Tapa'],
+  },
+  {
+    id: 'goldfish-bowl',
+    name: 'Pecera Dorada 80L',
+    litros: 80,
+    dimensions: '75 × 35 × 35 cm',
+    price: 95000,
+    waterType: ['dulce'],
+    descripcion: 'Ideal para peces dorados o ciclidos. Filtración potente incluida.',
+    incluye: ['Pecera 80L', 'Filtro externo M', 'Luz LED full spectrum', 'Sustrato natural', 'Tapa', 'Termómetro'],
   },
 ]

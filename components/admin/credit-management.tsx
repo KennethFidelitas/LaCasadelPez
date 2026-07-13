@@ -99,12 +99,25 @@ export function CreditManagement() {
         }
         if (credit.status === 'Vencido') {
           acc.overdue += 1
+          acc.overdueBalance += Math.max(credit.amount - credit.paid, 0)
         }
         return acc
       },
-      { total: 0, pending: 0, open: 0, overdue: 0 },
+      { total: 0, pending: 0, open: 0, overdue: 0, overdueBalance: 0 },
     )
   }, [credits])
+
+  const highRiskCredits = useMemo(
+    () =>
+      credits.filter(
+        (credit) =>
+          credit.status === 'Vencido' ||
+          credit.amount - credit.paid >= credit.amount * 0.5,
+      ),
+    [credits],
+  )
+
+  const riskRatio = creditMetrics.total > 0 ? Math.round((creditMetrics.overdueBalance / creditMetrics.total) * 100) : 0
 
   function resetCreditForm() {
     setEditingCreditId(null)
@@ -168,7 +181,7 @@ export function CreditManagement() {
 
   return (
     <section className="grid gap-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="Creditos registrados"
           value={String(credits.length)}
@@ -192,6 +205,12 @@ export function CreditManagement() {
           value={String(creditMetrics.overdue)}
           icon={Activity}
           detail="Casos que requieren gestion administrativa"
+        />
+        <MetricCard
+          title="Riesgo de cobranza"
+          value={`${riskRatio}%`}
+          icon={FilePenLine}
+          detail="Porcentaje del total en saldo vencido"
         />
       </div>
 
@@ -322,12 +341,14 @@ export function CreditManagement() {
                   <TableHead>Estado</TableHead>
                   <TableHead>Saldo</TableHead>
                   <TableHead>Vence</TableHead>
+                  <TableHead>Riesgo</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCredits.map((credit) => {
                   const balance = Math.max(credit.amount - credit.paid, 0)
+                  const riskScore = credit.status === 'Vencido' ? 'Alto' : balance >= credit.amount * 0.5 ? 'Medio' : 'Bajo'
 
                   return (
                     <TableRow key={credit.id}>
@@ -354,6 +375,19 @@ export function CreditManagement() {
                       </TableCell>
                       <TableCell>{formatPrice(balance)}</TableCell>
                       <TableCell>{formatDate(credit.dueDate)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            riskScore === 'Alto'
+                              ? 'destructive'
+                              : riskScore === 'Medio'
+                                ? 'warning'
+                                : 'secondary'
+                          }
+                        >
+                          {riskScore}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button size="icon-sm" variant="outline" onClick={() => editCredit(credit)}>
