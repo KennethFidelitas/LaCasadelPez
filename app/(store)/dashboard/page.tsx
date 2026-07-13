@@ -6,7 +6,7 @@ import { getPosCatalog, getSalesDashboardData } from '@/lib/pos/data'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
 
 export default async function DashboardPage() {
-  await requireAdminUser('/dashboard')
+  const { user } = await requireAdminUser('/dashboard')
 
   let posCatalog: PosCatalogProduct[] = []
   let posCatalogError: string | null = null
@@ -52,6 +52,7 @@ export default async function DashboardPage() {
 
   return (
     <AdminDashboard
+      adminUserId={user.id}
       posCatalog={posCatalog}
       posCatalogError={posCatalogError}
       sales={sales}
