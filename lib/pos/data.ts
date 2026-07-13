@@ -190,7 +190,7 @@ export async function getSalesDashboardData(): Promise<{
     } satisfies PosSaleRecord
   })
 
-  const returnRequests = ((orders ?? [])
+  const returnRequests = (orders ?? [])
     .filter(
       (order) =>
         order.status === 'cancelado' ||
