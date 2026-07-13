@@ -190,7 +190,7 @@ export async function getSalesDashboardData(): Promise<{
     } satisfies PosSaleRecord
   })
 
-  const returnRequests = (orders ?? [])
+  const returnRequests = ((orders ?? [])
     .filter(
       (order) =>
         order.status === 'cancelado' ||
@@ -222,7 +222,7 @@ export async function getSalesDashboardData(): Promise<{
         refundAmount: Number(order.total ?? 0),
         notes: order.notes ?? null,
       }
-    }) as PosReturnRequest[]
+    })) as PosReturnRequest[]
 
   const todaysSales = sales.filter(
     (sale) => isSameLocalDay(sale.createdAt) && sale.paymentStatus === 'Pagado' && sale.status !== 'Cancelado',
