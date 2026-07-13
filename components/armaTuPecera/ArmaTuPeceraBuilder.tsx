@@ -1,48 +1,72 @@
 'use client'
 
+// RF: Cliente elige entre pecera prediseñada o personalizada
+// RF: Cliente selecciona sistema de iluminación
+// RF: Cliente agrega accesorios adicionales
+// RF: Sistema crea la orden de producción al confirmar pago inicial
+
 import { useState, useMemo } from 'react'
-import { Minus, Plus, Fish as FishIcon } from 'lucide-react'
+import { CheckCircle, Minus, Package, Plus, Settings, Fish as FishIcon, Lightbulb, ShoppingBag } from 'lucide-react'
 import { StepSection } from './StepSection'
 import { ResumenSidebar } from './ResumenSidebar'
-import { PECERAS, FILTROS, PECES, formatColones } from './data'
-import type { ArmaTuPeceraState, WaterType, Fish, Filtro, Pecera } from './types'
+import {
+  PECERAS, FILTROS, PECES, ILUMINACIONES, ACCESORIOS_OPCIONALES, PECERAS_PREDISENO,
+  formatColones,
+} from './data'
+import type {
+  ArmaTuPeceraState, ArmaTuPeceraStateExtended,
+  WaterType, Fish, Filtro, Pecera, Iluminacion, AccesorioOpcional, AquariumMode,
+} from './types'
 
 const LITROS_POR_PEZ = 5
 
-const INITIAL_STATE: ArmaTuPeceraState = {
+const INITIAL_STATE: ArmaTuPeceraStateExtended = {
+  mode: null,
   waterType: null,
   selectedPeceraId: null,
   selectedFiltroId: null,
+  selectedIluminacionId: null,
+  accesoriosSeleccionados: {},
   fishQuantities: {},
 }
 
 export function ArmaTuPeceraBuilder() {
-  const [state, setState] = useState<ArmaTuPeceraState>(INITIAL_STATE)
+  const [state, setState] = useState<ArmaTuPeceraStateExtended>(INITIAL_STATE)
 
-  // Derived selections
+  // ─── Selecciones derivadas ───────────────────────────────────────────────
   const selectedPecera = useMemo(
     () => PECERAS.find(p => p.id === state.selectedPeceraId) ?? null,
-    [state.selectedPeceraId]
+    [state.selectedPeceraId],
   )
   const selectedFiltro = useMemo(
     () => FILTROS.find(f => f.id === state.selectedFiltroId) ?? null,
-    [state.selectedFiltroId]
+    [state.selectedFiltroId],
+  )
+  const selectedIluminacion = useMemo(
+    () => ILUMINACIONES.find(l => l.id === state.selectedIluminacionId) ?? null,
+    [state.selectedIluminacionId],
+  )
+  const selectedPrediseno = useMemo(
+    () => PECERAS_PREDISENO.find(p => p.id === state.selectedPeceraId) ?? null,
+    [state.selectedPeceraId],
+  )
+  const accesoriosActivos = useMemo(
+    () => ACCESORIOS_OPCIONALES.filter(a => state.accesoriosSeleccionados[a.id]),
+    [state.accesoriosSeleccionados],
   )
   const availableFish = useMemo(
     () => PECES.filter(f => f.waterType === state.waterType),
-    [state.waterType]
+    [state.waterType],
   )
 
-  // Incompatibility: a fish is blocked if any cart fish lists it as incompatible,
-  // OR if it lists any cart fish in its own incompatibleWith.
+  // ─── Incompatibilidades de peces ────────────────────────────────────────
   const incompatibleFishIds = useMemo(() => {
     const cartIds = new Set(
       Object.entries(state.fishQuantities)
         .filter(([, qty]) => qty > 0)
-        .map(([id]) => id)
+        .map(([id]) => id),
     )
     if (cartIds.size === 0) return new Set<string>()
-
     const blocked = new Set<string>()
     PECES.forEach(fish => {
       if (cartIds.has(fish.id)) return
@@ -58,33 +82,61 @@ export function ArmaTuPeceraBuilder() {
 
   const totalPeces = useMemo(
     () => Object.values(state.fishQuantities).reduce((sum, qty) => sum + qty, 0),
-    [state.fishQuantities]
+    [state.fishQuantities],
   )
   const litrosUsados = totalPeces * LITROS_POR_PEZ
 
+  // ─── Total ───────────────────────────────────────────────────────────────
   const total = useMemo(() => {
     let sum = 0
-    if (selectedPecera) sum += selectedPecera.price
-    if (selectedFiltro) sum += selectedFiltro.price
+    if (state.mode === 'prediseno' && selectedPrediseno) {
+      sum += selectedPrediseno.price
+    } else {
+      if (selectedPecera) sum += selectedPecera.price
+      if (selectedFiltro) sum += selectedFiltro.price
+    }
+    if (selectedIluminacion) sum += selectedIluminacion.price
+    accesoriosActivos.forEach(a => { sum += a.price })
     Object.entries(state.fishQuantities).forEach(([fishId, qty]) => {
       const fish = PECES.find(f => f.id === fishId)
       if (fish) sum += fish.price * qty
     })
     return sum
-  }, [selectedPecera, selectedFiltro, state.fishQuantities])
+  }, [state, selectedPecera, selectedFiltro, selectedPrediseno, selectedIluminacion, accesoriosActivos])
 
-  // --- Handlers ---
-  const handleSelectWaterType = (wt: WaterType) => {
-    setState({ waterType: wt, selectedPeceraId: null, selectedFiltroId: null, fishQuantities: {} })
-  }
+  // ─── Handlers ────────────────────────────────────────────────────────────
+  const handleSelectMode = (mode: AquariumMode) => setState({ ...INITIAL_STATE, mode })
 
-  const handleSelectPecera = (id: string) => {
-    setState(prev => ({ ...prev, selectedPeceraId: id, selectedFiltroId: null, fishQuantities: {} }))
-  }
+  const handleSelectWaterType = (wt: WaterType) =>
+    setState(prev => ({
+      ...prev, waterType: wt,
+      selectedPeceraId: null, selectedFiltroId: null, selectedIluminacionId: null,
+      accesoriosSeleccionados: {}, fishQuantities: {},
+    }))
 
-  const handleSelectFiltro = (id: string) => {
+  const handleSelectPecera = (id: string) =>
+    setState(prev => ({
+      ...prev, selectedPeceraId: id,
+      selectedFiltroId: null, selectedIluminacionId: null, fishQuantities: {},
+    }))
+
+  const handleSelectFiltro = (id: string) =>
     setState(prev => ({ ...prev, selectedFiltroId: id }))
-  }
+
+  const handleSelectIluminacion = (id: string) =>
+    setState(prev => ({
+      ...prev,
+      selectedIluminacionId: prev.selectedIluminacionId === id ? null : id,
+    }))
+
+  const handleToggleAccesorio = (id: string) =>
+    setState(prev => ({
+      ...prev,
+      accesoriosSeleccionados: {
+        ...prev.accesoriosSeleccionados,
+        [id]: !prev.accesoriosSeleccionados[id],
+      },
+    }))
 
   const handleFishQty = (fishId: string, delta: number) => {
     setState(prev => {
@@ -99,27 +151,22 @@ export function ArmaTuPeceraBuilder() {
     })
   }
 
-  const handleRemoveWaterType = () => setState(INITIAL_STATE)
-  const handleRemovePecera = () =>
-    setState(prev => ({ ...prev, selectedPeceraId: null, selectedFiltroId: null, fishQuantities: {} }))
-  const handleRemoveFiltro = () =>
-    setState(prev => ({ ...prev, selectedFiltroId: null }))
-  const handleRemoveFish = (fishId: string) =>
-    setState(prev => {
-      const quantities = { ...prev.fishQuantities }
-      delete quantities[fishId]
-      return { ...prev, fishQuantities: quantities }
-    })
   const handleClear = () => setState(INITIAL_STATE)
 
-  // Step gating
+  // ─── Gating de pasos ─────────────────────────────────────────────────────
+  const step0Done = state.mode !== null
   const step1Done = state.waterType !== null
   const step2Done = state.selectedPeceraId !== null
-  const step3Done = state.selectedFiltroId !== null
+  const step3Done = state.mode === 'prediseno' ? step2Done : state.selectedFiltroId !== null
+  const step4Done = state.selectedIluminacionId !== null
 
   const densityPercent = selectedPecera
     ? Math.min(100, (litrosUsados / selectedPecera.litros) * 100)
     : 0
+
+  const litrosBase = state.mode === 'prediseno'
+    ? selectedPrediseno?.litros ?? 0
+    : selectedPecera?.litros ?? 0
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -131,80 +178,160 @@ export function ArmaTuPeceraBuilder() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_288px]">
-        {/* Builder column */}
         <div className="flex flex-col gap-4">
-          {/* Step 1 — Water type */}
+
+          {/* ── Step 0: Tipo de configuración ──────────────────────────── */}
           <StepSection
             step={1}
-            title="Tipo de agua"
-            description="Define el ecosistema base de tu acuario"
-            isCompleted={step1Done}
+            title="¿Cómo querés tu pecera?"
+            description="Elegí entre una opción lista o personalizala a tu gusto"
+            isCompleted={step0Done}
             isLocked={false}
           >
             <div className="grid grid-cols-2 gap-3">
-              <WaterTypeCard
-                type="dulce"
-                selected={state.waterType === 'dulce'}
-                onClick={() => handleSelectWaterType('dulce')}
+              <ModeCard
+                mode="prediseno"
+                selected={state.mode === 'prediseno'}
+                onClick={() => handleSelectMode('prediseno')}
               />
-              <WaterTypeCard
-                type="salada"
-                selected={state.waterType === 'salada'}
-                onClick={() => handleSelectWaterType('salada')}
+              <ModeCard
+                mode="personalizada"
+                selected={state.mode === 'personalizada'}
+                onClick={() => handleSelectMode('personalizada')}
               />
             </div>
           </StepSection>
 
-          {/* Step 2 — Pecera */}
+          {/* ── Step 1: Tipo de agua ───────────────────────────────────── */}
           <StepSection
             step={2}
-            title="Pecera"
-            description="Elige el tamaño que más se ajuste a tu espacio"
+            title="Tipo de agua"
+            description="Define el ecosistema base de tu acuario"
+            isCompleted={step1Done}
+            isLocked={!step0Done}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <WaterTypeCard type="dulce" selected={state.waterType === 'dulce'} onClick={() => handleSelectWaterType('dulce')} />
+              <WaterTypeCard type="salada" selected={state.waterType === 'salada'} onClick={() => handleSelectWaterType('salada')} />
+            </div>
+          </StepSection>
+
+          {/* ── Step 2: Pecera (prediseñada o a medida) ────────────────── */}
+          <StepSection
+            step={3}
+            title={state.mode === 'prediseno' ? 'Elige tu kit completo' : 'Pecera'}
+            description={
+              state.mode === 'prediseno'
+                ? 'Kits completos listos para montar, adaptados a tu tipo de agua'
+                : 'Elige el tamaño que más se ajuste a tu espacio'
+            }
             isCompleted={step2Done}
             isLocked={!step1Done}
           >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {PECERAS.map(pecera => (
-                <PeceraCard
-                  key={pecera.id}
-                  pecera={pecera}
-                  selected={state.selectedPeceraId === pecera.id}
-                  onClick={() => handleSelectPecera(pecera.id)}
-                />
-              ))}
-            </div>
+            {state.mode === 'prediseno' ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {PECERAS_PREDISENO
+                  .filter(p => !state.waterType || p.waterType.includes(state.waterType!))
+                  .map(pecera => (
+                    <PredisenoCard
+                      key={pecera.id}
+                      pecera={pecera}
+                      selected={state.selectedPeceraId === pecera.id}
+                      onClick={() => handleSelectPecera(pecera.id)}
+                    />
+                  ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {PECERAS.map(pecera => (
+                  <PeceraCard
+                    key={pecera.id}
+                    pecera={pecera}
+                    selected={state.selectedPeceraId === pecera.id}
+                    onClick={() => handleSelectPecera(pecera.id)}
+                  />
+                ))}
+              </div>
+            )}
           </StepSection>
 
-          {/* Step 3 — Filtro */}
+          {/* ── Step 3: Filtro (solo modo personalizada) ───────────────── */}
+          {state.mode === 'personalizada' && (
+            <StepSection
+              step={4}
+              title="Filtro"
+              description="Solo los filtros compatibles con tu pecera están disponibles"
+              isCompleted={step3Done}
+              isLocked={!step2Done}
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {FILTROS.map(filtro => {
+                  const compatible = selectedPecera
+                    ? selectedPecera.litros >= filtro.minLitros && selectedPecera.litros <= filtro.maxLitros
+                    : false
+                  return (
+                    <FiltroCard
+                      key={filtro.id}
+                      filtro={filtro}
+                      selected={state.selectedFiltroId === filtro.id}
+                      compatible={compatible}
+                      onClick={() => compatible && handleSelectFiltro(filtro.id)}
+                    />
+                  )
+                })}
+              </div>
+            </StepSection>
+          )}
+
+          {/* ── Step 4: Iluminación ────────────────────────────────────── */}
           <StepSection
-            step={3}
-            title="Filtro"
-            description="Solo los filtros compatibles con tu pecera son seleccionables"
-            isCompleted={step3Done}
-            isLocked={!step2Done}
+            step={state.mode === 'personalizada' ? 5 : 4}
+            title="Sistema de iluminación"
+            description="Elige la luz adecuada según el tamaño de tu pecera y sus habitantes"
+            isCompleted={step4Done}
+            isLocked={!step3Done}
           >
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {FILTROS.map(filtro => {
-                const compatible = selectedPecera
-                  ? selectedPecera.litros >= filtro.minLitros &&
-                    selectedPecera.litros <= filtro.maxLitros
-                  : false
+              {ILUMINACIONES.map(luz => {
+                const compatible = litrosBase > 0
+                  ? litrosBase >= luz.minLitros && litrosBase <= luz.maxLitros
+                  : true
                 return (
-                  <FiltroCard
-                    key={filtro.id}
-                    filtro={filtro}
-                    selected={state.selectedFiltroId === filtro.id}
+                  <IluminacionCard
+                    key={luz.id}
+                    luz={luz}
+                    selected={state.selectedIluminacionId === luz.id}
                     compatible={compatible}
-                    onClick={() => compatible && handleSelectFiltro(filtro.id)}
+                    onClick={() => compatible && handleSelectIluminacion(luz.id)}
                   />
                 )
               })}
             </div>
           </StepSection>
 
-          {/* Step 4 — Peces */}
+          {/* ── Step 5: Accesorios adicionales ────────────────────────── */}
           <StepSection
-            step={4}
+            step={state.mode === 'personalizada' ? 6 : 5}
+            title="Accesorios adicionales"
+            description="Completa tu pecera con los extras que necesitás"
+            isCompleted={accesoriosActivos.length > 0}
+            isLocked={!step4Done}
+          >
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {ACCESORIOS_OPCIONALES.map(acc => (
+                <AccesorioCard
+                  key={acc.id}
+                  accesorio={acc}
+                  selected={!!state.accesoriosSeleccionados[acc.id]}
+                  onClick={() => handleToggleAccesorio(acc.id)}
+                />
+              ))}
+            </div>
+          </StepSection>
+
+          {/* ── Step 6: Peces ─────────────────────────────────────────── */}
+          <StepSection
+            step={state.mode === 'personalizada' ? 7 : 6}
             title="Peces y fauna"
             description={
               state.waterType
@@ -212,51 +339,29 @@ export function ArmaTuPeceraBuilder() {
                 : 'Selecciona el tipo de agua primero'
             }
             isCompleted={Object.keys(state.fishQuantities).length > 0}
-            isLocked={!step3Done}
+            isLocked={!step4Done}
           >
-            {/* Density bar */}
-            {selectedPecera && (
+            {litrosBase > 0 && (
               <div className="mb-4">
                 <div className="mb-1.5 flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Densidad del acuario</span>
-                  <span
-                    className={`font-mono font-medium ${
-                      densityPercent >= 90
-                        ? 'text-coral'
-                        : densityPercent >= 70
-                        ? 'text-sand'
-                        : 'text-teal'
-                    }`}
-                  >
+                  <span className={`font-mono font-medium ${
+                    densityPercent >= 90 ? 'text-destructive' : densityPercent >= 70 ? 'text-yellow-500' : 'text-green-600'
+                  }`}>
                     {Math.round(densityPercent)}%
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      densityPercent >= 90
-                        ? 'bg-coral'
-                        : densityPercent >= 70
-                        ? 'bg-sand'
-                        : 'bg-teal'
+                      densityPercent >= 90 ? 'bg-destructive' : densityPercent >= 70 ? 'bg-yellow-500' : 'bg-green-600'
                     }`}
                     style={{ width: `${densityPercent}%` }}
                   />
                 </div>
-                {densityPercent >= 90 && (
-                  <p className="mt-1.5 text-xs text-coral">
-                    Capacidad crítica — considera una pecera más grande o reducir peces.
-                  </p>
-                )}
-                {densityPercent >= 70 && densityPercent < 90 && (
-                  <p className="mt-1.5 text-xs text-sand">
-                    Acercándose al límite recomendado de densidad.
-                  </p>
-                )}
               </div>
             )}
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {availableFish.map(fish => {
                 const qty = state.fishQuantities[fish.id] ?? 0
                 const isIncompatible = incompatibleFishIds.has(fish.id)
@@ -275,17 +380,27 @@ export function ArmaTuPeceraBuilder() {
           </StepSection>
         </div>
 
-        {/* Sidebar column */}
+        {/* ── Sidebar ──────────────────────────────────────────────────── */}
         <div className="sticky top-4 self-start">
           <ResumenSidebar
             state={state}
             total={total}
             litrosUsados={litrosUsados}
             totalPeces={totalPeces}
-            onRemoveWaterType={handleRemoveWaterType}
-            onRemovePecera={handleRemovePecera}
-            onRemoveFiltro={handleRemoveFiltro}
-            onRemoveFish={handleRemoveFish}
+            onRemoveWaterType={() => setState(prev => ({
+              ...prev, waterType: null, selectedPeceraId: null, selectedFiltroId: null,
+              selectedIluminacionId: null, accesoriosSeleccionados: {}, fishQuantities: {},
+            }))}
+            onRemovePecera={() => setState(prev => ({
+              ...prev, selectedPeceraId: null, selectedFiltroId: null,
+              selectedIluminacionId: null, fishQuantities: {},
+            }))}
+            onRemoveFiltro={() => setState(prev => ({ ...prev, selectedFiltroId: null }))}
+            onRemoveFish={(fishId) => setState(prev => {
+              const quantities = { ...prev.fishQuantities }
+              delete quantities[fishId]
+              return { ...prev, fishQuantities: quantities }
+            })}
             onClear={handleClear}
           />
         </div>
@@ -294,31 +409,21 @@ export function ArmaTuPeceraBuilder() {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
+// ─── Subcomponentes ───────────────────────────────────────────────────────────
 
-function WaterTypeCard({
-  type,
-  selected,
-  onClick,
-}: {
-  type: WaterType
-  selected: boolean
-  onClick: () => void
-}) {
+function ModeCard({ mode, selected, onClick }: { mode: AquariumMode; selected: boolean; onClick: () => void }) {
   const config = {
-    dulce: {
-      icon: '💧',
-      label: 'Agua Dulce',
-      description: 'Lagos, ríos y estanques. Gran variedad de especies tropicales coloridas.',
+    prediseno: {
+      icon: <Package className="h-8 w-8 text-primary" />,
+      label: 'Kit prediseñado',
+      description: 'Seleccioná un kit completo ya armado, listo para llevar a casa.',
     },
-    salada: {
-      icon: '🌊',
-      label: 'Agua Salada',
-      description: 'Ecosistemas de arrecife. Peces exóticos de alto impacto visual.',
+    personalizada: {
+      icon: <Settings className="h-8 w-8 text-primary" />,
+      label: 'Personalizada',
+      description: 'Elegí cada componente por separado según tus preferencias.',
     },
-  }[type]
+  }[mode]
 
   return (
     <button
@@ -329,6 +434,26 @@ function WaterTypeCard({
           : 'border-border bg-background hover:border-teal hover:bg-secondary'
       }`}
     >
+      <div className="mb-2">{config.icon}</div>
+      <div className="text-sm font-medium text-foreground">{config.label}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{config.description}</div>
+      {selected && <CheckCircle className="mt-2 h-4 w-4 text-teal" />}
+    </button>
+  )
+}
+
+function WaterTypeCard({ type, selected, onClick }: { type: WaterType; selected: boolean; onClick: () => void }) {
+  const config = {
+    dulce: { icon: '💧', label: 'Agua Dulce', description: 'Lagos, ríos y estanques. Gran variedad de especies tropicales coloridas.' },
+    salada: { icon: '🌊', label: 'Agua Salada', description: 'Ecosistemas de arrecife. Peces exóticos de alto impacto visual.' },
+  }[type]
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border p-4 text-left transition-colors ${
+        selected ? 'border-teal bg-secondary ring-1 ring-teal' : 'border-border bg-background hover:border-teal hover:bg-secondary'
+      }`}
+    >
       <div className="mb-2 text-3xl">{config.icon}</div>
       <div className="text-sm font-medium text-foreground">{config.label}</div>
       <div className="mt-1 text-xs text-muted-foreground">{config.description}</div>
@@ -336,183 +461,169 @@ function WaterTypeCard({
   )
 }
 
-function PeceraCard({
-  pecera,
-  selected,
-  onClick,
-}: {
-  pecera: Pecera
-  selected: boolean
-  onClick: () => void
-}) {
+function PredisenoCard({ pecera, selected, onClick }: { pecera: any; selected: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg border p-3 text-left transition-colors ${
-        selected
-          ? 'border-teal bg-secondary ring-1 ring-teal'
-          : 'border-border bg-background hover:border-teal hover:bg-secondary'
+      className={`rounded-lg border p-4 text-left transition-colors ${
+        selected ? 'border-teal bg-secondary ring-1 ring-teal' : 'border-border bg-background hover:border-teal hover:bg-secondary'
       }`}
     >
-      <div className="relative mb-1 h-40 w-40">
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20" />
-        <div className="absolute inset-1.5 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30" />
-        <div className="absolute inset-3 flex items-center justify-center rounded-md bg-card shadow">
-          {pecera.image
-            ? <img src={pecera.image} alt={pecera.name} className="h-full w-full object-cover rounded-md" />
-            : <FishIcon className="h-8 w-8 text-primary/50" />}
-        </div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-sm font-semibold text-foreground">{pecera.name}</span>
+        <span className="font-mono text-xs text-muted-foreground">{pecera.litros}L</span>
       </div>
-      <span className="mb-1 inline-block rounded-sm bg-accent/20 px-1.5 py-0.5 font-mono text-xs text-teal">
-        {pecera.litros}L
-      </span>
-      <div className="mb-0.5 text-sm font-medium text-foreground">{pecera.name}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{pecera.dimensions}</div>
-      <div className="mt-2 font-mono text-sm font-medium text-primary">
-        {formatColones(pecera.price)}
-      </div>
+      <p className="mb-2 text-xs text-muted-foreground">{pecera.descripcion}</p>
+      <ul className="mb-3 grid gap-0.5">
+        {pecera.incluye.map((item: string) => (
+          <li key={item} className="flex items-center gap-1.5 text-xs text-foreground/80">
+            <CheckCircle className="h-3 w-3 shrink-0 text-green-500" />
+            {item}
+          </li>
+        ))}
+      </ul>
+      <div className="font-mono text-sm font-bold text-primary">{formatColones(pecera.price)}</div>
     </button>
   )
 }
 
-function FiltroCard({
-  filtro,
-  selected,
-  compatible,
-  onClick,
-}: {
-  filtro: Filtro
-  selected: boolean
-  compatible: boolean
-  onClick: () => void
-}) {
-  const rangeLabel =
-    filtro.maxLitros === Infinity
-      ? `${filtro.minLitros}L+`
-      : `${filtro.minLitros}–${filtro.maxLitros}L`
+function PeceraCard({ pecera, selected, onClick }: { pecera: Pecera; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border p-3 text-left transition-colors ${
+        selected ? 'border-teal bg-secondary ring-1 ring-teal' : 'border-border bg-background hover:border-teal hover:bg-secondary'
+      }`}
+    >
+      <div className="relative mb-1 h-32 w-full">
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20" />
+        <div className="absolute inset-2 flex items-center justify-center">
+          <FishIcon className="h-8 w-8 text-primary/40" />
+        </div>
+      </div>
+      <span className="mb-1 inline-block rounded-sm bg-accent/20 px-1.5 py-0.5 font-mono text-xs text-teal">{pecera.litros}L</span>
+      <div className="mb-0.5 text-sm font-medium text-foreground">{pecera.name}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{pecera.dimensions}</div>
+      <div className="mt-2 font-mono text-sm font-medium text-primary">{formatColones(pecera.price)}</div>
+    </button>
+  )
+}
 
+function FiltroCard({ filtro, selected, compatible, onClick }: { filtro: Filtro; selected: boolean; compatible: boolean; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
       className={`rounded-lg border p-3 transition-colors ${
-        !compatible
-          ? 'cursor-not-allowed opacity-40'
-          : selected
-          ? 'cursor-pointer border-teal bg-secondary ring-1 ring-teal'
+        !compatible ? 'cursor-not-allowed opacity-40'
+          : selected ? 'cursor-pointer border-teal bg-secondary ring-1 ring-teal'
           : 'cursor-pointer border-border bg-background hover:border-teal hover:bg-secondary'
       }`}
     >
-      <div className="relative mb-1 h-40 w-40">
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20" />
-        <div className="absolute inset-1.5 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30" />
-        <div className="absolute inset-3 flex items-center justify-center rounded-md bg-card shadow">
-          {filtro.image
-            ? <img src={filtro.image} alt={filtro.name} className="h-full w-full object-cover rounded-md" />
-            : <FishIcon className="h-8 w-8 text-primary/50" />}
-        </div>
+      <div className="relative mb-1 h-24 w-full flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
+        <span className="text-2xl">🔵</span>
       </div>
-      <span
-        className={`mb-1 inline-block rounded-sm px-1.5 py-0.5 text-xs ${
-          compatible ? 'bg-accent/20 text-teal' : 'bg-destructive/20 text-destructive'
-        }`}
-      >
+      <span className={`mb-1 inline-block rounded-sm px-1.5 py-0.5 text-xs ${compatible ? 'bg-accent/20 text-teal' : 'bg-destructive/20 text-destructive'}`}>
         {compatible ? 'Compatible' : 'Incompatible'}
       </span>
       <div className="mb-0.5 text-sm font-medium text-foreground">{filtro.name}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">
-        {filtro.tipo} · {rangeLabel}
-      </div>
-      <div className="mt-2 font-mono text-sm font-medium text-primary">
-        {formatColones(filtro.price)}
-      </div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{filtro.tipo} · {filtro.minLitros}–{filtro.maxLitros === Infinity ? '∞' : filtro.maxLitros}L</div>
+      <div className="mt-2 font-mono text-sm font-medium text-primary">{formatColones(filtro.price)}</div>
     </div>
   )
 }
 
-const TEMPERAMENT_BADGE: Record<
-  Fish['temperament'],
-  { label: string; className: string }
-> = {
-  pacifico: { label: 'Pacífico', className: 'bg-accent/20 text-teal' },
-  solitario: { label: 'Solitario', className: 'bg-accent/20 text-teal' },
-  agresivo: { label: 'Agresivo', className: 'bg-destructive/20 text-destructive' },
-  semiagresivo: { label: 'Semiagresi…', className: 'bg-sand/30 text-sand' },
-  predador: { label: 'Predador', className: 'bg-destructive/20 text-destructive' },
+function IluminacionCard({ luz, selected, compatible, onClick }: { luz: Iluminacion; selected: boolean; compatible: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-lg border p-3 transition-colors ${
+        !compatible ? 'cursor-not-allowed opacity-40'
+          : selected ? 'cursor-pointer border-teal bg-secondary ring-1 ring-teal'
+          : 'cursor-pointer border-border bg-background hover:border-teal hover:bg-secondary'
+      }`}
+    >
+      <div className="relative mb-1 h-24 w-full flex items-center justify-center rounded-lg bg-gradient-to-br from-yellow-100/30 to-orange-100/30">
+        <Lightbulb className={`h-8 w-8 ${selected ? 'text-yellow-500' : 'text-yellow-400/60'}`} />
+      </div>
+      <span className={`mb-1 inline-block rounded-sm px-1.5 py-0.5 text-xs ${compatible ? 'bg-accent/20 text-teal' : 'bg-destructive/20 text-destructive'}`}>
+        {compatible ? luz.tipo : 'Incompatible'}
+      </span>
+      <div className="text-sm font-medium text-foreground">{luz.name}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{luz.potencia} · {luz.cobertura}</div>
+      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{luz.descripcion}</p>
+      <div className="mt-2 font-mono text-sm font-medium text-primary">{formatColones(luz.price)}</div>
+    </div>
+  )
 }
 
-function FishCard({
-  fish,
-  qty,
-  isIncompatible,
-  onAdd,
-  onRemove,
-}: {
-  fish: Fish
-  qty: number
-  isIncompatible: boolean
-  onAdd: () => void
-  onRemove: () => void
+function AccesorioCard({ accesorio, selected, onClick }: { accesorio: AccesorioOpcional; selected: boolean; onClick: () => void }) {
+  const categoryEmoji: Record<string, string> = {
+    calefaccion: '🌡️', co2: '💨', sustrato: '🪨', proteccion: '🛡️',
+    monitoreo: '📊', mantenimiento: '🧹', 'tratamiento-agua': '💧',
+  }
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border p-3 text-left transition-colors ${
+        selected ? 'border-teal bg-secondary ring-1 ring-teal' : 'border-border bg-background hover:border-teal hover:bg-secondary'
+      }`}
+    >
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <span className="text-xl">{categoryEmoji[accesorio.categoria] ?? '📦'}</span>
+        {selected && <CheckCircle className="h-4 w-4 shrink-0 text-teal" />}
+      </div>
+      <div className="text-sm font-medium text-foreground">{accesorio.name}</div>
+      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{accesorio.descripcion}</p>
+      <div className="mt-2 font-mono text-sm font-medium text-primary">{formatColones(accesorio.price)}</div>
+    </button>
+  )
+}
+
+function FishCard({ fish, qty, isIncompatible, onAdd, onRemove }: {
+  fish: Fish; qty: number; isIncompatible: boolean; onAdd: () => void; onRemove: () => void
 }) {
+  const TEMPERAMENT_BADGE: Record<Fish['temperament'], { label: string; className: string }> = {
+    pacifico: { label: 'Pacífico', className: 'bg-accent/20 text-teal' },
+    solitario: { label: 'Solitario', className: 'bg-accent/20 text-teal' },
+    agresivo: { label: 'Agresivo', className: 'bg-destructive/20 text-destructive' },
+    semiagresivo: { label: 'Semiagresi…', className: 'bg-yellow-100 text-yellow-700' },
+    predador: { label: 'Predador', className: 'bg-destructive/20 text-destructive' },
+  }
   const badge = TEMPERAMENT_BADGE[fish.temperament]
-  const atMax = qty >= fish.maxQuantity
   const isBlocked = isIncompatible && qty === 0
 
   return (
-    <div
-      className={`rounded-lg border p-3 transition-colors ${
-        isBlocked
-          ? 'pointer-events-none cursor-not-allowed border-border bg-background opacity-40'
-          : qty > 0
-          ? 'border-teal bg-secondary ring-1 ring-teal'
-          : 'border-border bg-background'
-      }`}
-    >
+    <div className={`rounded-lg border p-3 transition-colors ${
+      isBlocked ? 'pointer-events-none opacity-40'
+        : qty > 0 ? 'border-teal bg-secondary ring-1 ring-teal'
+        : 'border-border bg-background'
+    }`}>
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="relative h-14 w-14 shrink-0">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20" />
-            <div className="absolute inset-1 rounded-md bg-gradient-to-br from-primary/30 to-accent/30" />
-            <div className="absolute inset-2 flex items-center justify-center rounded-sm bg-card shadow">
-              {fish.image
-                ? <img src={fish.image} alt={fish.name} className="h-full w-full object-cover rounded-sm" />
-                : <FishIcon className="h-4 w-4 text-primary/50" />}
-            </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 shrink-0">
+            <FishIcon className="h-5 w-5 text-primary/50" />
           </div>
           <div>
-            <div className="text-sm font-medium text-foreground leading-tight">{fish.name}</div>
-            <span className={`inline-block rounded-sm px-1.5 py-0.5 text-xs ${badge.className}`}>
-              {badge.label}
-            </span>
+            <div className="text-sm font-medium text-foreground">{fish.name}</div>
+            <span className={`inline-block rounded-sm px-1.5 py-0.5 text-xs ${badge.className}`}>{badge.label}</span>
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-mono text-xs text-primary">
-            {formatColones(fish.price)}
-          </div>
+          <div className="font-mono text-xs text-primary">{formatColones(fish.price)}</div>
           <div className="text-xs text-muted-foreground">c/u</div>
         </div>
       </div>
-
       <p className="mb-2.5 text-xs text-muted-foreground line-clamp-2">{fish.description}</p>
-
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">Máx. {fish.maxQuantity}</span>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={onRemove}
-            disabled={qty === 0}
-            className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-          >
+          <button onClick={onRemove} disabled={qty === 0}
+            className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40">
             <Minus className="h-3 w-3" />
           </button>
-          <span className="w-5 text-center font-mono text-sm font-medium text-foreground">
-            {qty}
-          </span>
-          <button
-            onClick={onAdd}
-            disabled={atMax}
-            className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-          >
+          <span className="w-5 text-center font-mono text-sm font-medium text-foreground">{qty}</span>
+          <button onClick={onAdd} disabled={qty >= fish.maxQuantity}
+            className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40">
             <Plus className="h-3 w-3" />
           </button>
         </div>
