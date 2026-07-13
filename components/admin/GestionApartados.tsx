@@ -21,11 +21,13 @@ import { Input } from '@/components/ui/forms/input'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import {
-  type Apartado, type ApartadoAlert, type ApartadoStatus, type ApartadoPaymentMethod,
-  APARTADO_STATUS_LABELS, ALERT_TYPE_LABELS, ALERT_URGENCY,
   listarApartados, listarAlertasPendientes, cancelarApartado, resolverAlerta,
   registrarPagoApartado, confirmarPagoApartado, generarAlertasVencimiento,
 } from '@/lib/apartados/actions'
+import {
+  type Apartado, type ApartadoAlert, type ApartadoStatus, type ApartadoPaymentMethod,
+  APARTADO_STATUS_LABELS, ALERT_TYPE_LABELS, ALERT_URGENCY,
+} from '@/lib/apartados/types'
 import { formatPrice, formatDate } from '@/lib/format'
 
 // ─── Panel principal ──────────────────────────────────────────────────────────

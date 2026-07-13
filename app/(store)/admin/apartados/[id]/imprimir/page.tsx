@@ -3,9 +3,9 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPrice, formatDate } from '@/lib/format'
-import { APARTADO_STATUS_LABELS } from '@/lib/apartados/actions'
-import type { Apartado } from '@/lib/apartados/actions'
-import { PrintButton } from './print-button'
+import { APARTADO_STATUS_LABELS } from '@/lib/apartados/types'
+import type { Apartado } from '@/lib/apartados/types'
+import { BackButton, PrintButton } from './print-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -53,7 +53,10 @@ export default async function ImprimirApartadoPage({ params }: PageProps) {
           <span className="text-sm text-muted-foreground">
             Comprobante de apartado #{apt.apartado_number}
           </span>
-          <PrintButton />
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <PrintButton />
+          </div>
         </div>
       </div>
 
