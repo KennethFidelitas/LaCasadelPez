@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Download, FileText, Printer, Search } from 'lucide-react'
+import { Download, FileDown, FileText, Printer, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/display/badge'
 import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -136,6 +136,83 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
     URL.revokeObjectURL(url)
   }
 
+
+  function handleExportPdf() {
+    // RF: Exportar reporte a PDF — usamos una ventana de impresión dedicada
+    // con CSS @media print que oculta filtros y controles.
+    const generatedDateStr = new Date().toLocaleString('es-CR')
+    const rows = filteredSales.map((sale) => `
+      <tr>
+        <td>${sale.orderNumber}</td>
+        <td>${formatDateTime(sale.createdAt)}</td>
+        <td>${sale.customer ?? '—'}</td>
+        <td>${sale.channel}</td>
+        <td>${sale.status}</td>
+        <td>${sale.paymentStatus}</td>
+        <td>${sale.paymentMethod ?? '—'}</td>
+        <td style="text-align:right;font-family:monospace">${new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(sale.total)}</td>
+      </tr>
+    `).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reporte de Ventas — La Casa del Pez</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 20px; }
+    h1 { font-size: 16px; margin-bottom: 2px; }
+    .subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+    .metric { border: 1px solid #ddd; border-radius: 4px; padding: 8px; }
+    .metric .label { font-size: 10px; color: #666; margin-bottom: 2px; }
+    .metric .value { font-size: 13px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 10px; border-bottom: 2px solid #ddd; }
+    td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafafa; }
+    .footer { margin-top: 16px; font-size: 10px; color: #888; text-align: center; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 15mm; }
+    }
+  </style>
+</head>
+<body>
+  <h1>La Casa del Pez — Reporte de Ventas</h1>
+  <p class="subtitle">Generado el ${generatedDateStr}</p>
+  <div class="metrics">
+    <div class="metric"><div class="label">Ventas brutas</div><div class="value">${new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(totals.grossSales)}</div></div>
+    <div class="metric"><div class="label">Ventas pagadas</div><div class="value">${new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(totals.confirmedSales)}</div></div>
+    <div class="metric"><div class="label">Transacciones</div><div class="value">${totals.transactions}</div></div>
+    <div class="metric"><div class="label">Ticket promedio</div><div class="value">${new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(totals.averageTicket)}</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Canal</th>
+        <th>Estado</th><th>Pago</th><th>Método</th><th>Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p class="footer">La Casa del Pez · ${filteredSales.length} registro(s) · ${generatedDateStr}</p>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    // Pequeño delay para que el navegador renderice antes de imprimir
+    setTimeout(() => {
+      win.print()
+      win.close()
+    }, 400)
+  }
+
   return (
     <section className="grid gap-6">
       <Card className="rounded-lg">
@@ -232,6 +309,10 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
               <Button type="button" variant="outline" className="flex-1" onClick={handleExportCsv} disabled={filteredSales.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar
+              </Button>
+              <Button type="button" variant="outline" className="flex-1" onClick={handleExportPdf} disabled={filteredSales.length === 0}>
+                <FileDown className="mr-2 h-4 w-4" />
+                PDF
               </Button>
               <Button type="button" variant="outline" className="flex-1" onClick={() => window.print()} disabled={filteredSales.length === 0}>
                 <Printer className="mr-2 h-4 w-4" />
