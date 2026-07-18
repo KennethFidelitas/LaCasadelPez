@@ -57,6 +57,12 @@ import { Textarea } from '@/components/ui/forms/textarea'
 import { createCustomerContact } from '@/lib/customers/actions'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 import { crearApartado } from '@/lib/apartados/actions'
+import { DashboardAlertConfig } from '@/components/admin/DashboardAlertConfig'
+import {
+  type AlertConfig,
+  type AlertKey,
+  loadAlertConfig,
+} from '@/lib/dashboard-alerts-config'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { createPosSale } from '@/lib/pos/actions'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
@@ -194,6 +200,15 @@ export function AdminDashboard({
   customersError = null,
 }: AdminDashboardProps) {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
+  const [alertConfigs, setAlertConfigs] = useState<AlertConfig[]>(() => {
+    if (typeof window === 'undefined') return []
+    return loadAlertConfig()
+  })
+
+  function isAlertEnabled(key: AlertKey): boolean {
+    const cfg = alertConfigs.find(c => c.key === key)
+    return cfg ? cfg.enabled : true
+  }
   const [cartItems, setCartItems] = useState<CartItem[]>([])
 
   useEffect(() => {
@@ -773,20 +788,47 @@ async function sendTestEmail() {
 
                   <Card className="rounded-lg">
                     <CardHeader>
-                      <CardTitle>Alertas de hoy</CardTitle>
-                      <CardDescription>Lo que el administrador deberia revisar primero.</CardDescription>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle>Alertas de hoy</CardTitle>
+                          <CardDescription>Lo que el administrador deberia revisar primero.</CardDescription>
+                        </div>
+                        <DashboardAlertConfig onConfigChange={setAlertConfigs} />
+                      </div>
                     </CardHeader>
                     <CardContent className="grid gap-3">
-                      <AlertRow title="Caja principal abierta" detail="Cajero: Daniela Vargas · 08:02 a.m." />
-                      <AlertRow
-                        title={`${summary.pendingOrders} pedidos pendientes`}
-                        detail="Revisar pagos, inventario y tiempos de entrega."
-                      />
-                      <AlertRow
-                        title={`${summary.transactionsToday} transacciones confirmadas hoy`}
-                        detail="Incluye ventas POS y online con pago registrado."
-                      />
-                      <AlertRow title="1 pecera lista para entrega" detail="Proyecto PEC-222 en acabados finales." />
+                      {isAlertEnabled('caja_abierta') && (
+                        <AlertRow title="Caja principal abierta" detail="Cajero: Daniela Vargas · 08:02 a.m." />
+                      )}
+                      {isAlertEnabled('pedidos_pendientes') && (
+                        <AlertRow
+                          title={`${summary.pendingOrders} pedidos pendientes`}
+                          detail="Revisar pagos, inventario y tiempos de entrega."
+                        />
+                      )}
+                      {isAlertEnabled('transacciones_hoy') && (
+                        <AlertRow
+                          title={`${summary.transactionsToday} transacciones confirmadas hoy`}
+                          detail="Incluye ventas POS y online con pago registrado."
+                        />
+                      )}
+                      {isAlertEnabled('produccion_lista') && (
+                        <AlertRow title="1 pecera lista para entrega" detail="Proyecto PEC-222 en acabados finales." />
+                      )}
+                      {isAlertEnabled('stock_minimo') && (
+                        <AlertRow title="Stock bajo mínimo detectado" detail="Revisar inventario de animales y productos." />
+                      )}
+                      {isAlertEnabled('apartados_vencen') && (
+                        <AlertRow title="Apartados próximos a vencer" detail="Revisar el módulo de apartados para contactar clientes." />
+                      )}
+                      {isAlertEnabled('mortalidad_reciente') && (
+                        <AlertRow title="Mortalidad reciente registrada" detail="Revisar el módulo de mortalidad para detalles." />
+                      )}
+                      {alertConfigs.length > 0 && alertConfigs.every(c => !c.enabled) && (
+                        <p className="text-sm text-muted-foreground py-2">
+                          Todas las alertas están desactivadas. Configurá cuáles querés ver.
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 </section>
