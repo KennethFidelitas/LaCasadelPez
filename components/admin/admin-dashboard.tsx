@@ -43,6 +43,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { GestionApartados } from '@/components/admin/GestionApartados'
 import { PaymentProofValidator } from '@/components/admin/PaymentProofValidator'
+import { OrderHistoryPanel } from '@/components/admin/order-history-panel'
 import { SalesDetailedReport } from '@/components/admin/sales-detailed-report'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
@@ -451,7 +452,7 @@ export function AdminDashboard({
           const sale = await createPosSale({
             items: cartItems,
             discount,
-            paymentMethod,
+            paymentMethod: getPaymentMethodLabel(paymentMethod),
           })
 
           setOrders((current) => [
@@ -459,9 +460,11 @@ export function AdminDashboard({
               id: sale.orderId,
               orderNumber: sale.orderNumber,
               customer: 'Cliente de mostrador',
+              customerEmail: null,
               channel: 'POS',
               total: sale.total,
               status: 'Confirmado',
+              rawStatus: 'confirmado',
               paymentStatus: 'Pagado',
               paymentMethod,
               createdAt: new Date().toISOString(),
@@ -565,6 +568,31 @@ export function AdminDashboard({
           toast.error(error instanceof Error ? error.message : 'No se pudo registrar el cliente')
         }
       })()
+    })
+  }
+
+  function handleOrderUpdated(
+    orderId: string,
+    rawStatus: PosSaleRecord['rawStatus'],
+    status: PosSaleRecord['status'],
+  ) {
+    const previousStatus = orders.find((order) => order.id === orderId)?.rawStatus ?? null
+
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === orderId ? { ...order, rawStatus, status } : order,
+      ),
+    )
+
+    setSummary((current) => {
+      const wasPending = previousStatus === 'pendiente'
+      const isPending = rawStatus === 'pendiente'
+      if (wasPending === isPending) return current
+
+      return {
+        ...current,
+        pendingOrders: Math.max(0, current.pendingOrders + (isPending ? 1 : -1)),
+      }
     })
   }
 
@@ -1427,98 +1455,12 @@ async function sendTestEmail() {
 
                 {/* Tab: Historial de ventas */}
                 {activeOrdersTab === 'historial' && (
-                  <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-                    <Card className="rounded-lg">
-                      <CardHeader>
-                        <CardTitle>Historial de ventas</CardTitle>
-                        <CardDescription>Transacciones reales registradas en el sistema por canal y fecha.</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {salesError && (
-                          <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-                            No se pudo cargar el historial de ventas. Detalle: {salesError}
-                          </div>
-                        )}
-                        {orders.length === 0 ? (
-                          <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                            Aún no hay ventas registradas para mostrar.
-                          </div>
-                        ) : (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Pedido</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Canal</TableHead>
-                                <TableHead>Pago</TableHead>
-                                <TableHead>Total</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Fecha</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {orders.map((order) => (
-                                <TableRow key={order.id}>
-                                  <TableCell>
-                                    <div className="font-medium">{order.orderNumber}</div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {order.transactionNumber ? `Tx ${order.transactionNumber}` : 'Sin transacción POS'}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{order.customer}</TableCell>
-                                  <TableCell>{order.channel}</TableCell>
-                                  <TableCell>{order.paymentMethod}</TableCell>
-                                  <TableCell>{formatPrice(order.total)}</TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-col gap-1">
-                                      <Badge
-                                        variant={
-                                          order.status === 'Cancelado'
-                                            ? 'destructive'
-                                            : order.status === 'Pendiente'
-                                              ? 'outline'
-                                              : 'default'
-                                        }
-                                      >
-                                        {order.status}
-                                      </Badge>
-                                      <span className="text-xs text-muted-foreground">{order.paymentStatus}</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{formatDateTime(order.createdAt)}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="rounded-lg">
-                      <CardHeader>
-                        <CardTitle>Analisis rapido</CardTitle>
-                        <CardDescription>Resumen inmediato para revisar transacciones y comportamiento del dia.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="grid gap-3">
-                        <AlertRow
-                          title={`Ticket promedio hoy: ${formatPrice(summary.averageTicketToday)}`}
-                          detail="Promedio calculado sobre las transacciones pagadas del día."
-                        />
-                        <AlertRow
-                          title={`Ventas POS hoy: ${summary.posSalesToday}`}
-                          detail="Mide la actividad de mostrador frente al resto de canales."
-                        />
-                        <AlertRow
-                          title={`Ventas online hoy: ${summary.onlineSalesToday}`}
-                          detail="Sirve para comparar el aporte del e-commerce en tiempo real."
-                        />
-                        <AlertRow
-                          title={`Pendientes por revisar: ${summary.pendingOrders}`}
-                          detail="Pedidos que todavía no están resueltos o entregados."
-                        />
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <OrderHistoryPanel
+                    orders={orders}
+                    salesError={salesError}
+                    summary={summary}
+                    onOrderUpdated={handleOrderUpdated}
+                  />
                 )}
               </section>
             )}

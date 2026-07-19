@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 
@@ -16,16 +17,69 @@ const posSaleItemSchema = z.object({
 const posSaleSchema = z.object({
   items: z.array(posSaleItemSchema).min(1),
   discount: z.number().nonnegative(),
-  paymentMethod: z.enum(['Efectivo', 'Tarjeta', 'Mixto']),
+  paymentMethod: z.enum(['Efectivo', 'Tarjeta', 'Credito', 'Crédito', 'Mixto']),
 })
 
 const PAYMENT_METHOD_MAP = {
   Efectivo: 'efectivo',
   Tarjeta: 'tarjeta',
+  Credito: 'credito',
+  Crédito: 'credito',
   Mixto: 'mixto',
 } as const
 
+const orderStatusSchema = z.enum([
+  'pendiente',
+  'confirmado',
+  'procesando',
+  'enviado',
+  'entregado',
+  'cancelado',
+  'reembolsado',
+])
+
+const orderStatusLabels: Record<z.infer<typeof orderStatusSchema>, string> = {
+  pendiente: 'Pendiente',
+  confirmado: 'Confirmado',
+  procesando: 'Preparacion',
+  enviado: 'Enviado',
+  entregado: 'Entregado',
+  cancelado: 'Cancelado',
+  reembolsado: 'Reembolsado',
+}
+
 type PosSupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+async function requirePosStaff(supabase: PosSupabaseClient) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError) {
+    throw new Error(userError.message)
+  }
+
+  if (!user) {
+    throw new Error('Debes iniciar sesión para realizar esta acción.')
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError) {
+    throw new Error(profileError.message)
+  }
+
+  if (!profile || !['admin', 'employee'].includes(profile.role)) {
+    throw new Error('Tu usuario no tiene permisos para administrar pedidos.')
+  }
+
+  return user
+}
 
 async function getOrCreateOpenSession(supabase: PosSupabaseClient, processedBy: string) {
 
@@ -64,36 +118,45 @@ async function getOrCreateOpenSession(supabase: PosSupabaseClient, processedBy: 
   return newSession
 }
 
+export async function updateOrderStatus(input: unknown) {
+  const payload = z.object({
+    orderId: z.string().uuid(),
+    status: orderStatusSchema,
+  }).parse(input)
+
+  const supabase = await createClient()
+  await requirePosStaff(supabase)
+
+  const { data: order, error } = await supabase
+    .from('orders')
+    .update({
+      status: payload.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', payload.orderId)
+    .select('id, order_number, status')
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/dashboard')
+
+  return {
+    id: order.id,
+    orderNumber: order.order_number,
+    status: order.status as z.infer<typeof orderStatusSchema>,
+    statusLabel: orderStatusLabels[order.status as z.infer<typeof orderStatusSchema>],
+  }
+}
+
 export async function createPosSale(input: unknown) {
   const payload = posSaleSchema.parse(input)
   const supabase = await createClient()
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError) {
-    throw new Error(userError.message)
-  }
-
-  if (!user) {
-    throw new Error('Debes iniciar sesión para registrar una venta.')
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, role')
-    .eq('id', user.id)
-    .single()
-
-  if (profileError) {
-    throw new Error(profileError.message)
-  }
-
-  if (!profile || !['admin', 'employee'].includes(profile.role)) {
-    throw new Error('Tu usuario no tiene permisos para registrar ventas POS.')
-  }
+  const user = await requirePosStaff(supabase)
 
   const itemIds = payload.items.map((item) => item.id)
   const subtotal = payload.items.reduce((sum, item) => sum + item.price * item.quantity, 0)

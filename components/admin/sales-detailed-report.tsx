@@ -258,8 +258,10 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
                   <SelectItem value="Pendiente">Pendiente</SelectItem>
                   <SelectItem value="Confirmado">Confirmado</SelectItem>
                   <SelectItem value="Preparacion">Preparacion</SelectItem>
+                  <SelectItem value="Enviado">Enviado</SelectItem>
                   <SelectItem value="Entregado">Entregado</SelectItem>
                   <SelectItem value="Cancelado">Cancelado</SelectItem>
+                  <SelectItem value="Reembolsado">Reembolsado</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>

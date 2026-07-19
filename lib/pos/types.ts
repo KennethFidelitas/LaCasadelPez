@@ -11,9 +11,11 @@ export interface PosSaleRecord {
   id: string
   orderNumber: string
   customer: string
+  customerEmail: string | null
   channel: 'POS' | 'Online' | 'Telefono'
   total: number
-  status: 'Pendiente' | 'Confirmado' | 'Preparacion' | 'Entregado' | 'Cancelado'
+  status: 'Pendiente' | 'Confirmado' | 'Preparacion' | 'Enviado' | 'Entregado' | 'Cancelado' | 'Reembolsado'
+  rawStatus: 'pendiente' | 'confirmado' | 'procesando' | 'enviado' | 'entregado' | 'cancelado' | 'reembolsado'
   paymentStatus: 'Pendiente' | 'Pagado' | 'Fallido' | 'Reembolsado'
   paymentMethod: string
   createdAt: string
