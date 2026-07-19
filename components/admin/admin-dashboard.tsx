@@ -69,6 +69,7 @@ import {
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { createPosSale } from '@/lib/pos/actions'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
+import { updateReturnRequestStatus as saveReturnRequestStatus } from '@/lib/returns/actions'
 
 type ModuleKey =
   | 'overview'
@@ -400,11 +401,25 @@ export function AdminDashboard({
   }, [returnRequestsList])
 
   function updateReturnRequestStatus(id: string, status: 'Aprobada' | 'Rechazada') {
-    setReturnRequestsList((current) =>
-      current.map((request) =>
-        request.id === id ? { ...request, requestStatus: status } : request,
-      ),
-    )
+    startSavingSale(() => {
+      void (async () => {
+        try {
+          const updated = await saveReturnRequestStatus({
+            requestId: id,
+            status: status === 'Aprobada' ? 'aprobada' : 'rechazada',
+          })
+
+          setReturnRequestsList((current) =>
+            current.map((request) =>
+              request.id === id ? { ...request, requestStatus: updated.status } : request,
+            ),
+          )
+          toast.success(`Solicitud ${status.toLowerCase()} correctamente.`)
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la solicitud.')
+        }
+      })()
+    })
   }
 
   function addToCart(product: PosProduct) {

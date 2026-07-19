@@ -4,6 +4,7 @@ import { getCustomerContacts } from '@/lib/customers/data'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 import { getPosCatalog, getSalesDashboardData } from '@/lib/pos/data'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
+import { getReturnRequestsForAdmin } from '@/lib/returns/actions'
 
 export default async function AdminPage() {
   const { user } = await requireAdminUser('/admin')
@@ -37,10 +38,15 @@ export default async function AdminPage() {
     sales = salesData.sales
     salesSummary = salesData.summary
     topProducts = salesData.topProducts
-    returnRequests = salesData.returnRequests
   } catch (error) {
     salesError =
       error instanceof Error ? error.message : 'No se pudo cargar el historial de ventas.'
+  }
+
+  try {
+    returnRequests = await getReturnRequestsForAdmin()
+  } catch {
+    returnRequests = []
   }
 
   try {

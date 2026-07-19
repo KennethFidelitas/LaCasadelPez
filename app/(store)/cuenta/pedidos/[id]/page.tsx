@@ -2,8 +2,10 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { CustomerOrderTrackingDetail, type CustomerOrder } from '@/components/store/order-tracking'
+import { ReturnRequestForm } from '@/components/store/return-request-form'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
+import { getCustomerReturnRequest } from '@/lib/returns/actions'
 import { createClient } from '@/lib/supabase/server'
 
 interface PageProps {
@@ -42,6 +44,7 @@ export default async function CustomerOrderTrackingPage({ params }: PageProps) {
   if (error || !orderData) notFound()
 
   const order = orderData as unknown as CustomerOrder
+  const returnRequest = await getCustomerReturnRequest(order.id)
 
   return (
     <div className="bg-muted/20">
@@ -65,6 +68,7 @@ export default async function CustomerOrderTrackingPage({ params }: PageProps) {
         </div>
 
         <CustomerOrderTrackingDetail order={order} />
+        <ReturnRequestForm order={order} existingRequest={returnRequest} />
       </section>
     </div>
   )
