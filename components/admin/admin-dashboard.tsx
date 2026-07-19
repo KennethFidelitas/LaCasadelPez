@@ -43,6 +43,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { GestionApartados } from '@/components/admin/GestionApartados'
 import { PaymentProofValidator } from '@/components/admin/PaymentProofValidator'
+import { SalesDetailedReport } from '@/components/admin/sales-detailed-report'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -1819,6 +1820,8 @@ async function sendTestEmail() {
                     </Button>
                   </CardContent>
                 </Card>
+
+                <SalesDetailedReport sales={orders} />
 
                 <div className="grid gap-6 xl:grid-cols-2">
                   <Card className="rounded-lg">
