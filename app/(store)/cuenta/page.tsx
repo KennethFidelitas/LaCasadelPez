@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, ShieldCheck, User } from 'lucide-react'
 import { LogoutButton } from '@/components/auth/logout-button'
+import { CustomerOrdersSummary, type CustomerOrder } from '@/components/store/order-tracking'
 import { Badge } from '@/components/ui/display/badge'
 import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -30,6 +31,24 @@ export default async function AccountPage() {
     .eq('id', user.id)
     .maybeSingle()
 
+  const { data: ordersData } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      order_number,
+      status,
+      payment_status,
+      total,
+      notes,
+      source,
+      created_at,
+      updated_at,
+      order_items(id, name, sku, quantity, unit_price, total)
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(8)
+
   const displayName =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     user.user_metadata?.first_name ||
@@ -38,6 +57,7 @@ export default async function AccountPage() {
   const email = profile?.email || user.email || 'Sin correo'
   const role = profile?.role || 'customer'
   const createdAt = profile?.created_at ? new Date(profile.created_at) : new Date(user.created_at)
+  const orders = ((ordersData ?? []) as unknown as CustomerOrder[])
 
   return (
     <div className="bg-muted/20">
@@ -110,6 +130,8 @@ export default async function AccountPage() {
             </CardContent>
           </Card>
         </div>
+
+        <CustomerOrdersSummary orders={orders} />
       </section>
     </div>
   )
