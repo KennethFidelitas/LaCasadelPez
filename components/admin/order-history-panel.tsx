@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
+import { Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateOrderStatus } from '@/lib/pos/actions'
 import type { PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { Badge } from '@/components/ui/display/badge'
+import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 
@@ -109,6 +112,7 @@ export function OrderHistoryPanel({
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Imprimir</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -161,6 +165,14 @@ export function OrderHistoryPanel({
                       </div>
                     </TableCell>
                     <TableCell>{formatDateTime(order.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" asChild title="Imprimir orden de pedido">
+                        <Link href={`/admin/pedidos/${order.id}/imprimir`} target="_blank">
+                          <Printer className="h-4 w-4" />
+                          <span className="sr-only">Imprimir orden</span>
+                        </Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
