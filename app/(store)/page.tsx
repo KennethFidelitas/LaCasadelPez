@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase/server'
 import { FeaturedProducts } from '@/components/store/featured-products'
 import { FeaturedAnimals } from '@/components/store/featured-animals'
 import { CategoryGrid } from '@/components/store/category-grid'
+import type { Product } from '@/lib/types'
+
+type ProductWithInventory = Product & {
+  inventory?: Array<{ quantity: number | null }>
+}
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -12,11 +17,19 @@ export default async function HomePage() {
   // Fetch featured products
   const { data: products } = await supabase
     .from('products')
-    .select('*, category:categories(*)')
+    .select('*, category:categories(*), inventory(quantity)')
     .eq('is_active', true)
     .eq('is_featured', true)
     .order('created_at', { ascending: false })
     .limit(8)
+
+  const productsWithStock = (products ?? []).map(product => {
+    const { inventory = [], ...productData } = product as ProductWithInventory
+    return {
+      ...productData,
+      stock_quantity: inventory.reduce((total, row) => total + Number(row.quantity ?? 0), 0),
+    }
+  })
 
   // Fetch featured animals
   const { data: animals } = await supabase
@@ -167,7 +180,7 @@ export default async function HomePage() {
               </Link>
             </Button>
           </div>
-          <FeaturedProducts products={products || []} />
+          <FeaturedProducts products={productsWithStock} />
         </div>
       </section>
 

@@ -1,0 +1,236 @@
+
+> my-project@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.10.1:3000
+- Environments: .env.local
+✓ Ready in 811ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (106kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (253kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+○ Compiling / ...
+ GET / 200 in 7.3s (next.js: 5.4s, proxy.ts: 25ms, application-code: 1873ms)
+ GET / 200 in 11.4s (next.js: 8.7s, proxy.ts: 791ms, application-code: 1921ms)
+[browser] Image with src "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1584267385494-9fdd9a71ad75?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+ GET / 200 in 2.0s (next.js: 10ms, proxy.ts: 580ms, application-code: 1439ms)
+[browser] Image with src "https://images.unsplash.com/photo-1518882605630-8ebf4c05a5d1?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1585325701165-351af916a581?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1584267385494-9fdd9a71ad75?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=1200" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 15.6s (next.js: 12.9s, proxy.ts: 464ms, application-code: 2.3s)
+ GET /dashboard 200 in 2.6s (next.js: 15ms, proxy.ts: 465ms, application-code: 2.1s)
+ GET /dashboard 200 in 2.4s (next.js: 29ms, proxy.ts: 1102ms, application-code: 1316ms)
+ GET /dashboard 200 in 2.4s (next.js: 28ms, proxy.ts: 901ms, application-code: 1519ms)
+ GET /dashboard 200 in 2.6s (next.js: 128ms, proxy.ts: 904ms, application-code: 1587ms)
+ GET /dashboard 200 in 2.6s (next.js: 69ms, proxy.ts: 902ms, application-code: 1648ms)
+ GET /cuenta 200 in 3.0s (next.js: 1763ms, proxy.ts: 566ms, application-code: 689ms)
+ GET /auth/login 200 in 1844ms (next.js: 1644ms, proxy.ts: 13ms, application-code: 187ms)
+ GET /auth/login 200 in 621ms (next.js: 8ms, proxy.ts: 12ms, application-code: 602ms)
+ GET / 200 in 1127ms (next.js: 23ms, proxy.ts: 9ms, application-code: 1095ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 2.1s (next.js: 1257ms, proxy.ts: 9ms, application-code: 834ms)
+ GET /armaTuPecera 200 in 2.1s (next.js: 1939ms, proxy.ts: 7ms, application-code: 134ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 1311ms (next.js: 24ms, proxy.ts: 15ms, application-code: 1273ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 723ms (next.js: 8ms, proxy.ts: 13ms, application-code: 702ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=filtros 200 in 655ms (next.js: 8ms, proxy.ts: 12ms, application-code: 635ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=alimento 200 in 737ms (next.js: 9ms, proxy.ts: 14ms, application-code: 715ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 1 count: 1
+ GET /tienda?categoria=iluminacion 200 in 561ms (next.js: 7ms, proxy.ts: 12ms, application-code: 541ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 1 count: 1
+ GET /tienda?categoria=medicamentos 200 in 502ms (next.js: 7ms, proxy.ts: 10ms, application-code: 484ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 553ms (next.js: 8ms, proxy.ts: 9ms, application-code: 536ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 501ms (next.js: 8ms, proxy.ts: 11ms, application-code: 483ms)
+ GET /auth/login 200 in 94ms (next.js: 31ms, proxy.ts: 16ms, application-code: 48ms)
+ GET /cuenta 200 in 1282ms (next.js: 123ms, proxy.ts: 629ms, application-code: 530ms)
+ GET /cuenta 200 in 1666ms (next.js: 28ms, proxy.ts: 602ms, application-code: 1036ms)
+ GET /dashboard 200 in 1749ms (next.js: 43ms, proxy.ts: 187ms, application-code: 1519ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 799ms (next.js: 7ms, proxy.ts: 195ms, application-code: 597ms)
+ GET /dashboard 200 in 2.0s (next.js: 7ms, proxy.ts: 359ms, application-code: 1650ms)
+⨯ Error: TypeError: fetch failed
+    at generarAlertasVencimiento (lib\apartados\actions.ts:255:20)
+  253 |   const supabase = createAdminClient()
+  254 |   const { data, error } = await supabase.rpc('generate_apartado_alerts')
+> 255 |   if (error) throw new Error(error.message)
+      |                    ^
+  256 |   return data as number
+  257 | } {
+  digest: '1446530329'
+}
+ POST /dashboard 500 in 1817ms (next.js: 20ms, proxy.ts: 562ms, application-code: 1235ms)
+  └─ ƒ generarAlertasVencimiento() in 231ms ..//lib/apartados/actions.ts
+[browser] Error: TypeError: fetch failed
+    at generarAlertasVencimiento (lib\apartados\actions.ts:255:20)
+  253 |   const supabase = createAdminClient()
+  254 |   const { data, error } = await supabase.rpc('generate_apartado_alerts')
+> 255 |   if (error) throw new Error(error.message)
+      |                    ^
+  256 |   return data as number
+  257 | } (components\admin\GestionApartados.tsx:47:60)
+⨯ Error: TypeError: fetch failed
+    at generarAlertasVencimiento (lib\apartados\actions.ts:255:20)
+  253 |   const supabase = createAdminClient()
+  254 |   const { data, error } = await supabase.rpc('generate_apartado_alerts')
+> 255 |   if (error) throw new Error(error.message)
+      |                    ^
+  256 |   return data as number
+  257 | } {
+  digest: '1446530329'
+}
+ POST /dashboard 500 in 895ms (next.js: 6ms, proxy.ts: 375ms, application-code: 513ms)
+  └─ ƒ generarAlertasVencimiento() in 6ms ..//lib/apartados/actions.ts
+[browser] Error: TypeError: fetch failed
+    at generarAlertasVencimiento (lib\apartados\actions.ts:255:20)
+  253 |   const supabase = createAdminClient()
+  254 |   const { data, error } = await supabase.rpc('generate_apartado_alerts')
+> 255 |   if (error) throw new Error(error.message)
+      |                    ^
+  256 |   return data as number
+  257 | } (components\admin\GestionApartados.tsx:47:60)
+⨯ Error: TypeError: fetch failed
+    at listarApartados (lib\apartados\actions.ts:210:20)
+  208 |
+  209 |   const { data, error } = await query
+> 210 |   if (error) throw new Error(error.message)
+      |                    ^
+  211 |   return data as Apartado[]
+  212 | }
+  213 | {
+  digest: '3308479959'
+}
+ POST /dashboard 500 in 8.2s (next.js: 25ms, proxy.ts: 268ms, application-code: 7.9s)
+  └─ ƒ listarApartados({}) in 7411ms ..//lib/apartados/actions.ts
+[browser] Error: TypeError: fetch failed
+    at listarApartados (lib\apartados\actions.ts:210:20)
+  208 |
+  209 |   const { data, error } = await query
+> 210 |   if (error) throw new Error(error.message)
+      |                    ^
+  211 |   return data as Apartado[]
+  212 | }
+  213 | (components\admin\GestionApartados.tsx:55:15)
+ GET /inventario/consultar-animales 200 in 3.6s (next.js: 1913ms, proxy.ts: 536ms, application-code: 1107ms)
+⨯ Error: TypeError: fetch failed
+    at listarAlertasPendientes (lib\apartados\actions.ts:225:20)
+  223 |     .order('created_at', { ascending: false })
+  224 |
+> 225 |   if (error) throw new Error(error.message)
+      |                    ^
+  226 |   return data as ApartadoAlert[]
+  227 | }
+  228 | {
+  digest: '3824093685'
+}
+ POST /dashboard 500 in 8.3s (next.js: 25ms, proxy.ts: 538ms, application-code: 7.7s)
+  └─ ƒ listarAlertasPendientes() in 7111ms ..//lib/apartados/actions.ts
+⨯ Error: TypeError: fetch failed
+    at listarApartados (lib\apartados\actions.ts:210:20)
+  208 |
+  209 |   const { data, error } = await query
+> 210 |   if (error) throw new Error(error.message)
+      |                    ^
+  211 |   return data as Apartado[]
+  212 | }
+  213 | {
+  digest: '3308479959'
+}
+ POST /dashboard 500 in 8.0s (next.js: 7ms, proxy.ts: 516ms, application-code: 7.5s)
+  └─ ƒ listarApartados({}) in 7048ms ..//lib/apartados/actions.ts
+ POST /inventario/consultar-animales 200 in 8.8s (next.js: 228ms, proxy.ts: 504ms, application-code: 8.0s)
+[browser] Error: TypeError: fetch failed
+    at listarApartados (lib\apartados\actions.ts:210:20)
+  208 |
+  209 |   const { data, error } = await query
+> 210 |   if (error) throw new Error(error.message)
+      |                    ^
+  211 |   return data as Apartado[]
+  212 | }
+  213 | (components\admin\GestionApartados.tsx:55:15)
+⨯ Error: TypeError: fetch failed
+    at listarAlertasPendientes (lib\apartados\actions.ts:225:20)
+  223 |     .order('created_at', { ascending: false })
+  224 |
+> 225 |   if (error) throw new Error(error.message)
+      |                    ^
+  226 |   return data as ApartadoAlert[]
+  227 | }
+  228 | {
+  digest: '3824093685'
+}
+ POST /dashboard 500 in 8.4s (next.js: 7ms, proxy.ts: 937ms, application-code: 7.5s)
+  └─ ƒ listarAlertasPendientes() in 7050ms ..//lib/apartados/actions.ts
+ GET /inventario/agregar-animal 200 in 3.2s (next.js: 1596ms, proxy.ts: 605ms, application-code: 981ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 958ms (next.js: 32ms, proxy.ts: 266ms, application-code: 660ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=filtros 200 in 1292ms (next.js: 18ms, proxy.ts: 517ms, application-code: 757ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=alimento 200 in 1013ms (next.js: 7ms, proxy.ts: 466ms, application-code: 540ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=alimento 200 in 1236ms (next.js: 11ms, proxy.ts: 1075ms, application-code: 150ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 2.2s (next.js: 12ms, proxy.ts: 1295ms, application-code: 940ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 2.6s (next.js: 8ms, proxy.ts: 718ms, application-code: 1838ms)
+[browser] Image with src "https://images.unsplash.com/photo-1520301255226-bf5f144451c1?w=1200" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=filtros 200 in 1810ms (next.js: 5ms, proxy.ts: 711ms, application-code: 1093ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 831ms (next.js: 5ms, proxy.ts: 197ms, application-code: 629ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 2.2s (next.js: 226ms, proxy.ts: 1059ms, application-code: 902ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 10 count: 10
+ GET /tienda 200 in 1114ms (next.js: 5ms, proxy.ts: 7ms, application-code: 1102ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 781ms (next.js: 5ms, proxy.ts: 8ms, application-code: 768ms)
+Error creating order: {
+  message: 'TypeError: fetch failed',
+  details: 'TypeError: fetch failed\n' +
+    '\n' +
+    'Caused by: Error: getaddrinfo ENOTFOUND mqheynyopdrwzbnqstzw.supabase.co (ENOTFOUND)\n' +
+    'Error: getaddrinfo ENOTFOUND mqheynyopdrwzbnqstzw.supabase.co\n' +
+    '    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)\n' +
+    '    at GetAddrInfoReqWrap.callbackTrampoline (node:internal/async_hooks:130:17)',
+  hint: '',
+  code: ''
+}
+ POST /api/orders 500 in 3.6s (next.js: 2.5s, proxy.ts: 682ms, application-code: 451ms)
+[TiendaPage] categories loaded: 7
+[TiendaPage] products loaded: 2 count: 2
+ GET /tienda?categoria=acuarios 200 in 2.6s (next.js: 96ms, proxy.ts: 796ms, application-code: 1739ms)
+[?25h

@@ -45,6 +45,7 @@ export function CartDrawer() {
 
   const [step, setStep] = useState<Step>('cart')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('sinpe')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [transactionNumber, setTransactionNumber] = useState('')
   const [customerNotes, setCustomerNotes] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
@@ -52,17 +53,20 @@ export function CartDrawer() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orderNumber, setOrderNumber] = useState<string | null>(null)
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function resetPaymentForm() {
     setStep('cart')
     setPaymentMethod('sinpe')
+    setCustomerEmail('')
     setTransactionNumber('')
     setCustomerNotes('')
     setProofFile(null)
     setProofPreview(null)
     setError(null)
     setOrderNumber(null)
+    setConfirmationEmailSent(false)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -82,6 +86,7 @@ export function CartDrawer() {
   }
 
   async function handleSubmitPayment() {
+    if (!/^\S+@\S+\.\S+$/.test(customerEmail.trim())) { setError('Ingresá un correo electrónico válido para recibir la confirmación.'); return }
     if (!proofFile) { setError('Debés adjuntar el comprobante de pago.'); return }
     if (!transactionNumber.trim()) { setError('Ingresá el número de transacción.'); return }
 
@@ -94,6 +99,7 @@ export function CartDrawer() {
       fd.append('payment_method', paymentMethod)
       fd.append('transaction_number', transactionNumber.trim())
       fd.append('proof_image', proofFile)
+      if (customerEmail.trim()) fd.append('customer_email', customerEmail.trim())
       if (customerNotes.trim()) fd.append('customer_notes', customerNotes.trim())
 
       const res = await fetch('/api/orders', { method: 'POST', body: fd })
@@ -102,6 +108,7 @@ export function CartDrawer() {
       if (!res.ok) { setError(data.error ?? 'No se pudo procesar el pago.'); return }
 
       setOrderNumber(data.order_number)
+      setConfirmationEmailSent(Boolean(data.email_sent))
       setStep('success')
       clearCart()
     } catch {
@@ -325,6 +332,25 @@ export function CartDrawer() {
                 )}
               </div>
 
+              {/* Correo de confirmación */}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">
+                  Correo electrónico *
+                </label>
+                <Input
+                  type="email"
+                  value={customerEmail}
+                  onChange={e => setCustomerEmail(e.target.value)}
+                  placeholder="cliente@ejemplo.com"
+                  maxLength={120}
+                  required
+                  autoComplete="email"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Te enviaremos la confirmación de compra y el respaldo de tu pedido.
+                </p>
+              </div>
+
               {/* Número de transacción */}
               <div className="grid gap-2">
                 <label className="text-sm font-medium">
@@ -427,7 +453,9 @@ export function CartDrawer() {
               )}
               <p className="mb-6 text-sm text-muted-foreground">
                 Revisaremos tu comprobante y confirmaremos el pedido en un plazo de <strong>1–2 horas hábiles</strong>.
-                Te notificaremos cuando el pago esté verificado.
+                {' '}{confirmationEmailSent
+                  ? `Enviamos el respaldo de la compra a ${customerEmail}.`
+                  : 'El pedido quedó registrado, pero no pudimos enviar el correo. Conservá el número de pedido y contactanos si necesitás ayuda.'}
               </p>
               <Button onClick={() => { closeCart(); resetPaymentForm() }} asChild>
                 <Link href="/tienda">Seguir comprando</Link>
@@ -461,7 +489,7 @@ export function CartDrawer() {
             <Button
               className="w-full gap-2"
               onClick={handleSubmitPayment}
-              disabled={loading || !proofFile || !transactionNumber.trim()}
+              disabled={loading || !proofFile || !transactionNumber.trim() || !customerEmail.trim()}
             >
               {loading ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />Enviando comprobante...</>
