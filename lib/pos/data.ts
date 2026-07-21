@@ -63,8 +63,10 @@ function mapOrderChannel(source: string | null | undefined): PosSaleRecord['chan
 function mapOrderStatus(status: string | null | undefined): PosSaleRecord['status'] {
   if (status === 'confirmado') return 'Confirmado'
   if (status === 'procesando' || status === 'en_proceso') return 'Preparacion'
+  if (status === 'enviado') return 'Enviado'
   if (status === 'entregado') return 'Entregado'
-  if (status === 'cancelado' || status === 'reembolsado') return 'Cancelado'
+  if (status === 'cancelado') return 'Cancelado'
+  if (status === 'reembolsado') return 'Reembolsado'
   return 'Pendiente'
 }
 
@@ -106,7 +108,7 @@ export async function getSalesDashboardData(): Promise<{
     await Promise.all([
       supabase
         .from('orders')
-        .select('id, order_number, total, status, payment_status, source, created_at, notes')
+        .select('id, order_number, user_id, total, status, payment_status, source, created_at, notes, profile:profiles(email, first_name, last_name)')
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
@@ -169,20 +171,26 @@ export async function getSalesDashboardData(): Promise<{
   const sales = (orders ?? []).map((order) => {
     const transaction = transactionByOrderId.get(order.id)
     const channel = mapOrderChannel(order.source)
+    const profile = Array.isArray(order.profile) ? order.profile[0] : order.profile
+    const profileName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ')
 
     return {
       id: order.id,
       orderNumber: order.order_number,
       customer:
         transaction?.customer_name ||
+        profileName ||
+        profile?.email ||
         (channel === 'POS'
           ? 'Cliente de mostrador'
           : channel === 'Telefono'
             ? 'Pedido telefonico'
             : 'Cliente tienda en linea'),
+      customerEmail: profile?.email ?? null,
       channel,
       total: Number(order.total ?? 0),
       status: mapOrderStatus(order.status),
+      rawStatus: (order.status ?? 'pendiente') as PosSaleRecord['rawStatus'],
       paymentStatus: mapPaymentStatus(order.payment_status),
       paymentMethod: mapPaymentMethod(transaction?.payment_method),
       createdAt: order.created_at,
