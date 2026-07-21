@@ -50,6 +50,12 @@ Completa los valores correspondientes:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `STRIPE_SECRET_KEY`
+- `RESEND_API_KEY` (envio de confirmaciones de compra)
+- `RESEND_FROM` (remitente verificado, por ejemplo `La Casa del Pez <ventas@tudominio.com>`)
+
+Antes de habilitar las confirmaciones por correo, ejecuta tambien la migracion
+`scripts/010_order_customer_email.sql` en Supabase y verifica el dominio usado en
+`RESEND_FROM` dentro de Resend.
 
 ## Levantar el proyecto en local
 

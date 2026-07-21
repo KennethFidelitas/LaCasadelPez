@@ -3,6 +3,28 @@ import { createClient } from '@/lib/supabase/server'
 import { ProductGrid } from '@/components/store/product-grid'
 import { ProductFilters } from '@/components/store/product-filters'
 import { Skeleton } from '@/components/ui/display/skeleton'
+import type { Product } from '@/lib/types'
+
+type ProductInventoryRow = {
+  quantity: number | null
+  low_stock_threshold: number | null
+}
+
+type ProductWithInventory = Product & {
+  inventory?: ProductInventoryRow[]
+}
+
+function addInventoryStock(product: ProductWithInventory): Product {
+  const { inventory = [], ...productData } = product
+
+  return {
+    ...productData,
+    stock_quantity: inventory.reduce((total, row) => total + Number(row.quantity ?? 0), 0),
+    low_stock_threshold: inventory.length
+      ? Math.max(...inventory.map(row => Number(row.low_stock_threshold ?? 0)))
+      : Number(product.low_stock_threshold ?? 0),
+  }
+}
 
 interface TiendaPageProps {
   searchParams: Promise<{
@@ -33,7 +55,7 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
   // Build product query
   let query = supabase
     .from('products')
-    .select('*, category:categories(*)', { count: 'exact' })
+    .select('*, category:categories(*), inventory(quantity, low_stock_threshold)', { count: 'exact' })
     .eq('is_active', true)
 
   // Apply category filter
@@ -81,6 +103,9 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
   }
 
   const totalPages = Math.ceil((count || 0) / limit)
+  const productsWithStock = (products ?? []).map(product =>
+    addInventoryStock(product as ProductWithInventory),
+  )
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -108,7 +133,7 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
         <main className="flex-1">
           <Suspense fallback={<ProductGridSkeleton />}>
             <ProductGrid
-              products={products || []}
+              products={productsWithStock}
               totalPages={totalPages}
               currentPage={page}
               totalProducts={count || 0}

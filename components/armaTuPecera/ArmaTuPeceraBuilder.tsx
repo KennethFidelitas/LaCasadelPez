@@ -596,21 +596,14 @@ export function ArmaTuPeceraBuilder() {
               </div>
             </StepSection>
 
-            {state.mode === 'personalizada' ? (
-              <VistaPecera3D
-                waterType={state.waterType}
-                peceraId={state.selectedPeceraId}
-                filtroId={state.selectedFiltroId}
-                fishQuantities={state.fishQuantities}
-              />
-            ) : (
-              <VistaPecera3D
-                waterType={state.waterType}
-                peceraId={null}
-                filtroId={null}
-                fishQuantities={state.fishQuantities}
-              />
-            )}
+            <VistaPecera3D
+              waterType={state.waterType}
+              peceraId={state.selectedPeceraId}
+              filtroId={state.selectedFiltroId}
+              iluminacionId={state.selectedIluminacionId}
+              accesoriosSeleccionados={state.accesoriosSeleccionados}
+              fishQuantities={state.fishQuantities}
+            />
           </div>
 
           <div className="sticky top-4 self-start">
