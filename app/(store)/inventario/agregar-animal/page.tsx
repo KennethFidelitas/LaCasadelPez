@@ -72,7 +72,13 @@ async function registrarAnimal(formData: FormData) {
   }
 
   if (imagenes.length) {
-    const { data: bucket } = await storage.storage.getBucket(ANIMAL_IMAGES_BUCKET)
+    const { data: bucket, error: getBucketError } = await storage.storage.getBucket(ANIMAL_IMAGES_BUCKET)
+    if (getBucketError && !getBucketError.message.toLowerCase().includes("not found")) {
+      throw new Error(
+        `No se pudo conectar con el almacenamiento de imágenes. Verifique que la clave administrativa pertenezca al proyecto configurado en NEXT_PUBLIC_SUPABASE_URL. Detalle: ${getBucketError.message}`
+      )
+    }
+
     if (!bucket) {
       const { error: bucketError } = await storage.storage.createBucket(ANIMAL_IMAGES_BUCKET, {
         public: true,

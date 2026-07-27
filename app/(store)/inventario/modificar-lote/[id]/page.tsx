@@ -13,6 +13,7 @@ export default function EditarAnimalPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
 
   useEffect(() => {
     if (!animalId) return
@@ -57,6 +58,21 @@ export default function EditarAnimalPage() {
       const formData = new FormData(e.currentTarget)
       const supabase = createClient()
 
+      if (selectedImages.length) {
+        const imagesFormData = new FormData()
+        selectedImages.forEach((image) => imagesFormData.append("imagenes", image))
+
+        const imageResponse = await fetch(`/api/animals/${animalId}/images`, {
+          method: "POST",
+          body: imagesFormData,
+        })
+        const imageResult = await imageResponse.json()
+
+        if (!imageResponse.ok) {
+          throw new Error(imageResult.error || "No se pudieron actualizar las imágenes.")
+        }
+      }
+
       console.log("🔍 Iniciando actualización del animal ID:", animalId)
 
       // Actualizar animal
@@ -81,9 +97,6 @@ export default function EditarAnimalPage() {
           lifespan: formData.get("esperanzaVida") || null,
           compatibility: (formData.get("compatibilidad") as string)
             ? (formData.get("compatibilidad") as string).split(",").map((item) => item.trim())
-            : null,
-          images: (formData.get("imagenes") as string)
-            ? (formData.get("imagenes") as string).split(",").map((img) => img.trim())
             : null,
           is_featured: formData.get("esFeatured") === "true",
         })
@@ -456,14 +469,45 @@ export default function EditarAnimalPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Imágenes (URLs separadas por coma)
+                    Imágenes del animal
                   </label>
-                  <textarea
+                  {animal.images?.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-3">
+                      {animal.images.map((image: string, index: number) => (
+                        <img
+                          key={image}
+                          src={image}
+                          alt={`Imagen actual ${index + 1} de ${animal.name}`}
+                          className="h-24 w-24 rounded-md border object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="file"
                     name="imagenes"
-                    defaultValue={animal.images?.join(", ") || ""}
-                    className="w-full rounded-md border px-3 py-2"
-                    rows={2}
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files ?? [])
+                      if (files.length > 5) {
+                        alert("Puede seleccionar un máximo de 5 imágenes.")
+                        event.target.value = ""
+                        setSelectedImages([])
+                        return
+                      }
+                      setSelectedImages(files)
+                    }}
+                    className="w-full cursor-pointer rounded-md border px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-[#006f95] file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-[#005f80]"
                   />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Si selecciona archivos, reemplazarán las imágenes actuales. Máximo 5 imágenes JPG, PNG o WEBP de 5 MB cada una.
+                  </p>
+                  {selectedImages.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-[#006f95]">
+                      {selectedImages.length} imagen{selectedImages.length === 1 ? "" : "es"} seleccionada{selectedImages.length === 1 ? "" : "s"}.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
