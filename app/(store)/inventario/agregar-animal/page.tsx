@@ -1,5 +1,20 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
+
+const ANIMAL_IMAGES_BUCKET = "animal-images"
+const MAX_IMAGES = 5
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+
+function fileExtension(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase()
+  if (extension && ["jpg", "jpeg", "png", "webp"].includes(extension)) {
+    return extension === "jpeg" ? "jpg" : extension
+  }
+
+  return file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"
+}
 
 async function registrarAnimal(formData: FormData) {
   "use server"
@@ -21,7 +36,9 @@ async function registrarAnimal(formData: FormData) {
   const origen = formData.get("origen") as string
   const esperanzaVida = formData.get("esperanzaVida") as string
   const compatibilidad = formData.get("compatibilidad") as string
-  const imagenes = formData.get("imagenes") as string
+  const imagenes = formData
+    .getAll("imagenes")
+    .filter((value): value is File => value instanceof File && value.size > 0)
   const cantidad = Number(formData.get("cantidad"))
   const ubicacion = formData.get("ubicacion") as string
   const proveedor = formData.get("proveedor") as string
@@ -37,6 +54,59 @@ async function registrarAnimal(formData: FormData) {
   const sku = `AN-${Date.now()}`
 
   const supabase = await createClient()
+  const storage = createAdminClient()
+  const uploadedPaths: string[] = []
+
+  if (imagenes.length > MAX_IMAGES) {
+    throw new Error(`Puede cargar un máximo de ${MAX_IMAGES} imágenes.`)
+  }
+
+  for (const imagen of imagenes) {
+    if (!ALLOWED_IMAGE_TYPES.has(imagen.type)) {
+      throw new Error("Las imágenes deben ser JPG, PNG o WEBP.")
+    }
+
+    if (imagen.size > MAX_IMAGE_SIZE) {
+      throw new Error(`Cada imagen puede pesar como máximo ${MAX_IMAGE_SIZE / 1024 / 1024} MB.`)
+    }
+  }
+
+  if (imagenes.length) {
+    const { data: bucket } = await storage.storage.getBucket(ANIMAL_IMAGES_BUCKET)
+    if (!bucket) {
+      const { error: bucketError } = await storage.storage.createBucket(ANIMAL_IMAGES_BUCKET, {
+        public: true,
+        allowedMimeTypes: [...ALLOWED_IMAGE_TYPES],
+        fileSizeLimit: MAX_IMAGE_SIZE,
+      })
+
+      if (bucketError && !bucketError.message.toLowerCase().includes("already exists")) {
+        throw new Error(`No se pudo preparar el almacenamiento de imágenes: ${bucketError.message}`)
+      }
+    }
+  }
+
+  const imageUrls: string[] = []
+  for (const [index, imagen] of imagenes.entries()) {
+    const path = `${slug}/${crypto.randomUUID()}-${index}.${fileExtension(imagen)}`
+    const { error: uploadError } = await storage.storage
+      .from(ANIMAL_IMAGES_BUCKET)
+      .upload(path, await imagen.arrayBuffer(), {
+        contentType: imagen.type,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      if (uploadedPaths.length) {
+        await storage.storage.from(ANIMAL_IMAGES_BUCKET).remove(uploadedPaths)
+      }
+      throw new Error(`No se pudo cargar la imagen "${imagen.name}": ${uploadError.message}`)
+    }
+
+    uploadedPaths.push(path)
+    const { data } = storage.storage.from(ANIMAL_IMAGES_BUCKET).getPublicUrl(path)
+    imageUrls.push(data.publicUrl)
+  }
 
   // Insertar animal
   const { data: animal, error: errorAnimal } = await supabase.from("animals").insert({
@@ -61,12 +131,15 @@ async function registrarAnimal(formData: FormData) {
     compatibility: compatibilidad
       ? compatibilidad.split(",").map((item: string) => item.trim())
       : null,
-    images: imagenes ? imagenes.split(",").map((img: string) => img.trim()) : null,
+    images: imageUrls.length ? imageUrls : null,
     is_active: true,
     is_featured: esFeatured,
   }).select()
 
   if (errorAnimal) {
+    if (uploadedPaths.length) {
+      await storage.storage.from(ANIMAL_IMAGES_BUCKET).remove(uploadedPaths)
+    }
     console.error("Error completo al registrar animal:", errorAnimal)
     throw new Error(
       `Error Supabase: ${errorAnimal.message} | Código: ${errorAnimal.code} | Detalle: ${errorAnimal.details}`
@@ -430,14 +503,18 @@ export default function AgregarAnimalPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Imágenes (URLs separadas por coma)
+                    Imágenes del animal
                   </label>
-                  <textarea
+                  <input
+                    type="file"
                     name="imagenes"
-                    placeholder="https://ejemplo.com/imagen1.jpg, https://ejemplo.com/imagen2.jpg"
-                    className="w-full rounded-md border px-3 py-2"
-                    rows={2}
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="w-full cursor-pointer rounded-md border px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-[#006f95] file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-[#005f80]"
                   />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Puede seleccionar hasta 5 imágenes JPG, PNG o WEBP (máximo 5 MB cada una).
+                  </p>
                 </div>
               </div>
             </div>
