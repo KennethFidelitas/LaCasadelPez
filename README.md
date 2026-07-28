@@ -8,7 +8,6 @@ Aplicacion web construida con Next.js para la tienda del proyecto.
 - React 19
 - TypeScript
 - Supabase
-- Stripe
 - Tailwind CSS
 
 ## Requisitos
