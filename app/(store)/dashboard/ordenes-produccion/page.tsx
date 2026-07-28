@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, FileText, Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/actions/button'
 import { TablaOrdenes, TablaOrdenesSkeleton } from '@/components/ordenes-produccion/tabla-ordenes'
@@ -49,12 +49,20 @@ export default async function OrdenesProduccionPage({ searchParams }: PageProps)
             Gestión de peceras personalizadas — cotizaciones, fabricación y entregas.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/ordenes-produccion/nueva">
-            <Plus className="h-4 w-4" />
-            Nueva orden
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/ordenes-produccion/reporte">
+              <FileText className="h-4 w-4" />
+              Ver reporte
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/ordenes-produccion/nueva">
+              <Plus className="h-4 w-4" />
+              Nueva orden
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {errorMsg && (

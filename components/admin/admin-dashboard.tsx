@@ -1618,6 +1618,12 @@ async function sendTestEmail() {
                         Ver todas las órdenes de producción
                       </Link>
                     </Button>
+                    <Button variant="outline" asChild className="w-full sm:w-auto">
+                      <Link href="/dashboard/ordenes-produccion/reporte">
+                        <FileText className="h-4 w-4" />
+                        Ver reporte de producción
+                      </Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </section>
@@ -1773,6 +1779,12 @@ async function sendTestEmail() {
                       <Link href="/inventario/imprimir-reporte" className="w-full justify-center">
                         <Printer className="mr-2 h-4 w-4" />
                         Imprimir reporte de inventario
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/dashboard/ordenes-produccion/reporte" className="w-full justify-center">
+                        <Factory className="mr-2 h-4 w-4" />
+                        Reporte de producción
                       </Link>
                     </Button>
                   </CardContent>
