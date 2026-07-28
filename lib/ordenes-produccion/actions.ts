@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { ProductionOrder } from '@/lib/types'
 import type { OrdenProduccionValues } from './schemas'
+import { crearReporteOrdenesProduccion } from './report'
 
 export async function listarOrdenes(params?: {
   status?: string
@@ -31,6 +33,18 @@ export async function listarOrdenes(params?: {
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return data ?? []
+}
+
+export async function obtenerReporteOrdenesProduccion() {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('production_orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return crearReporteOrdenesProduccion((data ?? []) as ProductionOrder[])
 }
 
 export async function obtenerOrden(id: string) {

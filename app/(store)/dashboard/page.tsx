@@ -2,6 +2,8 @@ import { AdminDashboard } from '@/components/admin/admin-dashboard'
 import { requireAdminUser } from '@/lib/auth/session'
 import { getCustomerContacts } from '@/lib/customers/data'
 import type { CustomerContactRecord } from '@/lib/customers/types'
+import { obtenerReporteOrdenesProduccion } from '@/lib/ordenes-produccion/actions'
+import type { ReporteOrdenesProduccion } from '@/lib/ordenes-produccion/report'
 import { getPosCatalog, getSalesDashboardData } from '@/lib/pos/data'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
 
@@ -24,6 +26,7 @@ export default async function DashboardPage() {
   }
   let topProducts: PosTopProduct[] = []
   let returnRequests: PosReturnRequest[] = []
+  let productionReport: ReporteOrdenesProduccion | null = null
 
   try {
     posCatalog = await getPosCatalog()
@@ -50,6 +53,12 @@ export default async function DashboardPage() {
       error instanceof Error ? error.message : 'No se pudo cargar la base de clientes.'
   }
 
+  try {
+    productionReport = await obtenerReporteOrdenesProduccion()
+  } catch {
+    productionReport = null
+  }
+
   return (
     <AdminDashboard
       adminUserId={user.id}
@@ -60,6 +69,7 @@ export default async function DashboardPage() {
       salesSummary={salesSummary}
       topProducts={topProducts}
       returnRequests={returnRequests}
+      productionReport={productionReport}
       customers={customers}
       customersError={customersError}
     />

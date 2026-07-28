@@ -17,7 +17,6 @@ import {
   Pencil,
   Plus,
   Printer,
-  Receipt,
   Repeat,
   Search,
   Settings2,
@@ -69,6 +68,7 @@ import {
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { createPosSale } from '@/lib/pos/actions'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
+import type { ReporteOrdenesProduccion } from '@/lib/ordenes-produccion/report'
 import { updateReturnRequestStatus as saveReturnRequestStatus } from '@/lib/returns/actions'
 
 type ModuleKey =
@@ -160,6 +160,7 @@ interface AdminDashboardProps {
   salesSummary: PosSalesSummary
   topProducts: PosTopProduct[]
   returnRequests: PosReturnRequest[]
+  productionReport?: ReporteOrdenesProduccion | null
   customers: CustomerContactRecord[]
   customersError?: string | null
 }
@@ -200,6 +201,7 @@ export function AdminDashboard({
   salesSummary,
   topProducts = [],
   returnRequests = [],
+  productionReport = null,
   customers,
   customersError = null,
 }: AdminDashboardProps) {
@@ -399,6 +401,32 @@ export function AdminDashboard({
 
     return { pending, approved, rejected, totalRefund }
   }, [returnRequestsList])
+
+  const businessKpis = useMemo(() => {
+    const lowStockItems = inventoryItems.filter((item) => item.stock <= item.min)
+    const inventoryValue = inventoryItems.reduce(
+      (sum, item) => sum + item.stock * item.cost,
+      0,
+    )
+    const activeProduction = productionReport?.resumen.activas ?? 0
+    const readyProduction = productionReport?.resumen.listasParaEntrega ?? 0
+    const productionBalance = productionReport?.resumen.saldosPendientes ?? 0
+    const pendingReturns = returnSummary.pending
+
+    const attentionItems =
+      summary.pendingOrders + lowStockItems.length + readyProduction + pendingReturns
+
+    return {
+      lowStockItems,
+      inventoryValue,
+      activeProduction,
+      readyProduction,
+      productionBalance,
+      pendingReturns,
+      attentionItems,
+      customersCount: customerRecords.length,
+    }
+  }, [customerRecords.length, inventoryItems, orders, productionReport, returnSummary.pending, summary.pendingOrders])
 
   function updateReturnRequestStatus(id: string, status: 'Aprobada' | 'Rechazada') {
     startSavingSale(() => {
@@ -776,58 +804,81 @@ async function sendTestEmail() {
                     title="Ventas hoy"
                     value={formatPrice(summary.totalSalesToday)}
                     icon={Wallet}
-                    detail={`${summary.transactionsToday} transacciones pagadas hoy`}
+                    detail={`${summary.transactionsToday} transacciones · ticket promedio ${formatPrice(summary.averageTicketToday)}`}
                   />
                   <OverviewCard
-                    title="Pendientes"
-                    value={String(summary.pendingOrders)}
-                    icon={Receipt}
-                    detail="Pedidos que requieren seguimiento operativo"
+                    title="Atencion requerida"
+                    value={String(businessKpis.attentionItems)}
+                    icon={Bell}
+                    detail="Pedidos, stock, produccion y devoluciones por revisar"
                   />
                   <OverviewCard
-                    title="POS hoy"
-                    value={String(summary.posSalesToday)}
-                    icon={CreditCard}
-                    detail="Ventas registradas desde mostrador"
+                    title="Inventario bajo"
+                    value={String(businessKpis.lowStockItems.length)}
+                    icon={Boxes}
+                    detail={`${formatPrice(businessKpis.inventoryValue)} en valor de inventario visible`}
                   />
                   <OverviewCard
-                    title="Online hoy"
-                    value={String(summary.onlineSalesToday)}
-                    icon={Store}
-                    detail="Ventas registradas desde e-commerce"
+                    title="Produccion activa"
+                    value={String(businessKpis.activeProduction)}
+                    icon={Factory}
+                    detail={`${businessKpis.readyProduction} listas · ${formatPrice(businessKpis.productionBalance)} por cobrar`}
                   />
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                   <Card className="rounded-lg">
                     <CardHeader>
-                      <CardTitle>Flujos operativos</CardTitle>
-                      <CardDescription>Resumen funcional del sistema administrativo.</CardDescription>
+                      <CardTitle>Estado del negocio</CardTitle>
+                      <CardDescription>Lectura rapida por area operativa con datos actuales.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-4">
                       <FlowRow
                         icon={CreditCard}
-                        title="RF-VEN Punto de venta"
-                        description="Abrir caja, armar carrito, aplicar descuento, cobrar y emitir recibo."
-                        progress={82}
+                        title="Ventas"
+                        description={`${summary.posSalesToday} POS y ${summary.onlineSalesToday} online pagadas hoy.`}
+                        progress={Math.min(100, summary.transactionsToday * 12)}
                       />
                       <FlowRow
                         icon={Boxes}
-                        title="RF-INV Inventario"
-                        description="Gestionar stock, costos, alertas de minimo y abastecimiento."
-                        progress={71}
+                        title="Inventario"
+                        description={
+                          businessKpis.lowStockItems.length > 0
+                            ? `${businessKpis.lowStockItems.length} articulos estan en minimo o por debajo.`
+                            : 'Sin articulos por debajo del minimo configurado.'
+                        }
+                        progress={
+                          inventoryItems.length === 0
+                            ? 0
+                            : Math.max(
+                                0,
+                                Math.round(
+                                  ((inventoryItems.length - businessKpis.lowStockItems.length) /
+                                    inventoryItems.length) *
+                                    100,
+                                ),
+                              )
+                        }
                       />
                       <FlowRow
                         icon={ShoppingCart}
-                        title="RF-ECO Pedidos"
-                        description="Monitorear estados, canales y cumplimiento de entregas."
-                        progress={76}
+                        title="Pedidos"
+                        description={`${summary.pendingOrders} pedidos pendientes de seguimiento.`}
+                        progress={summary.pendingOrders === 0 ? 100 : Math.max(10, 100 - summary.pendingOrders * 12)}
                       />
                       <FlowRow
                         icon={Factory}
-                        title="RF-PRO Produccion"
-                        description="Dar seguimiento a cotizaciones y fabricacion de peceras."
-                        progress={58}
+                        title="Produccion"
+                        description={`${businessKpis.activeProduction} ordenes activas y ${businessKpis.readyProduction} listas para entrega.`}
+                        progress={
+                          businessKpis.activeProduction === 0
+                            ? 100
+                            : Math.round(
+                                ((businessKpis.activeProduction - businessKpis.readyProduction) /
+                                  businessKpis.activeProduction) *
+                                  100,
+                              )
+                        }
                       />
                     </CardContent>
                   </Card>
@@ -844,7 +895,10 @@ async function sendTestEmail() {
                     </CardHeader>
                     <CardContent className="grid gap-3">
                       {isAlertEnabled('caja_abierta') && (
-                        <AlertRow title="Caja principal abierta" detail="Cajero: Daniela Vargas · 08:02 a.m." />
+                        <AlertRow
+                          title={`Caja principal ${cashSessionOpen ? 'abierta' : 'cerrada'}`}
+                          detail={`Monto inicial ${formatPrice(openingCash)} · efectivo esperado ${formatPrice(expectedCash)}`}
+                        />
                       )}
                       {isAlertEnabled('pedidos_pendientes') && (
                         <AlertRow
@@ -859,16 +913,32 @@ async function sendTestEmail() {
                         />
                       )}
                       {isAlertEnabled('produccion_lista') && (
-                        <AlertRow title="1 pecera lista para entrega" detail="Proyecto PEC-222 en acabados finales." />
+                        <AlertRow
+                          title={`${businessKpis.readyProduction} ordenes de produccion listas`}
+                          detail={`${formatPrice(businessKpis.productionBalance)} pendiente de cobrar en produccion activa.`}
+                        />
                       )}
                       {isAlertEnabled('stock_minimo') && (
-                        <AlertRow title="Stock bajo mínimo detectado" detail="Revisar inventario de animales y productos." />
+                        <AlertRow
+                          title={`${businessKpis.lowStockItems.length} articulos con stock bajo`}
+                          detail={
+                            businessKpis.lowStockItems.length > 0
+                              ? businessKpis.lowStockItems.slice(0, 3).map((item) => item.name).join(', ')
+                              : 'No hay articulos por debajo del minimo.'
+                          }
+                        />
                       )}
                       {isAlertEnabled('apartados_vencen') && (
-                        <AlertRow title="Apartados próximos a vencer" detail="Revisar el módulo de apartados para contactar clientes." />
+                        <AlertRow
+                          title={`${businessKpis.customersCount} clientes registrados`}
+                          detail="Usar clientes y apartados para dar seguimiento comercial."
+                        />
                       )}
                       {isAlertEnabled('mortalidad_reciente') && (
-                        <AlertRow title="Mortalidad reciente registrada" detail="Revisar el módulo de mortalidad para detalles." />
+                        <AlertRow
+                          title={`${businessKpis.pendingReturns} devoluciones pendientes`}
+                          detail={`${formatPrice(returnSummary.totalRefund)} acumulado en solicitudes de reembolso.`}
+                        />
                       )}
                       {alertConfigs.length > 0 && alertConfigs.every(c => !c.enabled) && (
                         <p className="text-sm text-muted-foreground py-2">
@@ -1601,21 +1671,33 @@ async function sendTestEmail() {
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">En producción</p>
-                        <p className="mt-2 text-2xl font-semibold">—</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {productionReport?.resumen.enProduccion ?? 0}
+                        </p>
                       </div>
                       <div className="rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">Listas para entrega</p>
-                        <p className="mt-2 text-2xl font-semibold">—</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {productionReport?.resumen.listasParaEntrega ?? 0}
+                        </p>
                       </div>
                       <div className="rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">Cotizaciones abiertas</p>
-                        <p className="mt-2 text-2xl font-semibold">—</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {productionReport?.resumen.cotizacionesAbiertas ?? 0}
+                        </p>
                       </div>
                     </div>
                     <Button asChild className="w-full sm:w-auto">
                       <Link href="/dashboard/ordenes-produccion">
                         <Factory className="h-4 w-4" />
                         Ver todas las órdenes de producción
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild className="w-full sm:w-auto">
+                      <Link href="/dashboard/ordenes-produccion/reporte">
+                        <FileText className="h-4 w-4" />
+                        Ver reporte de producción
                       </Link>
                     </Button>
                   </CardContent>
@@ -1773,6 +1855,12 @@ async function sendTestEmail() {
                       <Link href="/inventario/imprimir-reporte" className="w-full justify-center">
                         <Printer className="mr-2 h-4 w-4" />
                         Imprimir reporte de inventario
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/dashboard/ordenes-produccion/reporte" className="w-full justify-center">
+                        <Factory className="mr-2 h-4 w-4" />
+                        Reporte de producción
                       </Link>
                     </Button>
                   </CardContent>

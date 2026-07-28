@@ -1,31 +1,12 @@
 import Link from 'next/link'
-import { CheckCircle, Clock, PackageCheck, PackageSearch, Truck } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { CheckCircle, Clock, ListOrdered, PackageCheck, PackageSearch, ShoppingBag, Truck } from 'lucide-react'
 import { Badge } from '@/components/ui/display/badge'
 import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
 import { formatDateTime, formatPrice } from '@/lib/format'
-
-export type CustomerOrderItem = {
-  id: string
-  name: string
-  sku: string | null
-  quantity: number
-  unit_price?: number | null
-  total?: number | null
-}
-
-export type CustomerOrder = {
-  id: string
-  order_number: string
-  status: string
-  payment_status: string
-  total: number
-  notes: string | null
-  source: string | null
-  created_at: string
-  updated_at: string
-  order_items: CustomerOrderItem[]
-}
+import type { CustomerOrder } from '@/lib/orders/types'
+export type { CustomerOrder, CustomerOrderItem } from '@/lib/orders/types'
 
 const trackingSteps = [
   { key: 'pendiente', label: 'Recibido', icon: Clock },
@@ -53,12 +34,27 @@ const paymentLabels: Record<string, string> = {
   reembolsado: 'Reembolsado',
 }
 
-export function CustomerOrdersSummary({ orders }: { orders: CustomerOrder[] }) {
+export function CustomerOrdersSummary({
+  orders,
+  showViewAll = true,
+}: {
+  orders: CustomerOrder[]
+  showViewAll?: boolean
+}) {
   return (
     <Card className="rounded-lg lg:col-span-2">
       <CardHeader>
-        <CardTitle>Mis pedidos</CardTitle>
-        <CardDescription>Rastrea el estado de tus compras y revisa cuándo estarán listas.</CardDescription>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Mis pedidos</CardTitle>
+            <CardDescription>Rastrea el estado de tus compras y revisa cuándo estarán listas.</CardDescription>
+          </div>
+          {showViewAll && orders.length > 0 && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/cuenta/pedidos">Ver todos</Link>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="grid gap-3">
         {orders.length === 0 ? (
@@ -89,6 +85,43 @@ export function CustomerOrdersSummary({ orders }: { orders: CustomerOrder[] }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+export function CustomerOrdersDashboard({ orders }: { orders: CustomerOrder[] }) {
+  const activeOrders = orders.filter(
+    (order) => !['entregado', 'cancelado', 'reembolsado'].includes(order.status),
+  )
+  const deliveredOrders = orders.filter((order) => order.status === 'entregado')
+  const totalSpent = orders
+    .filter((order) => order.payment_status === 'pagado')
+    .reduce((sum, order) => sum + Number(order.total ?? 0), 0)
+
+  return (
+    <div className="grid gap-6">
+      <section className="grid gap-4 md:grid-cols-3">
+        <CustomerOrderMetric
+          title="Pedidos realizados"
+          value={String(orders.length)}
+          detail={`${activeOrders.length} en seguimiento`}
+          icon={ListOrdered}
+        />
+        <CustomerOrderMetric
+          title="Compras pagadas"
+          value={formatPrice(totalSpent)}
+          detail="Monto acumulado en pedidos pagados"
+          icon={ShoppingBag}
+        />
+        <CustomerOrderMetric
+          title="Entregados"
+          value={String(deliveredOrders.length)}
+          detail="Pedidos completados"
+          icon={PackageCheck}
+        />
+      </section>
+
+      <CustomerOrdersSummary orders={orders} showViewAll={false} />
+    </div>
   )
 }
 
@@ -194,6 +227,35 @@ function InfoCell({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 font-medium">{value}</p>
     </div>
+  )
+}
+
+function CustomerOrderMetric({
+  title,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  title: string
+  value: string
+  detail: string
+  icon: ComponentType<{ className?: string }>
+}) {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader className="flex-row items-start justify-between space-y-0">
+        <div>
+          <CardDescription>{title}</CardDescription>
+          <CardTitle className="mt-2 text-2xl">{value}</CardTitle>
+        </div>
+        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
   )
 }
 

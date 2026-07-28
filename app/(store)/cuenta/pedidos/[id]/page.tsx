@@ -1,10 +1,11 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { CustomerOrderTrackingDetail, type CustomerOrder } from '@/components/store/order-tracking'
+import { CustomerOrderTrackingDetail } from '@/components/store/order-tracking'
 import { ReturnRequestForm } from '@/components/store/return-request-form'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
+import { getCustomerOrderById } from '@/lib/orders/customer-orders'
 import { getCustomerReturnRequest } from '@/lib/returns/actions'
 import { createClient } from '@/lib/supabase/server'
 
@@ -23,27 +24,8 @@ export default async function CustomerOrderTrackingPage({ params }: PageProps) {
     redirect(`/auth/login?redirect=/cuenta/pedidos/${id}`)
   }
 
-  const { data: orderData, error } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      order_number,
-      status,
-      payment_status,
-      total,
-      notes,
-      source,
-      created_at,
-      updated_at,
-      order_items(id, name, sku, quantity, unit_price, total)
-    `)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  if (error || !orderData) notFound()
-
-  const order = orderData as unknown as CustomerOrder
+  const order = await getCustomerOrderById(user.id, id)
+  if (!order) notFound()
   const returnRequest = await getCustomerReturnRequest(order.id)
 
   return (
@@ -60,9 +42,9 @@ export default async function CustomerOrderTrackingPage({ params }: PageProps) {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/cuenta">
+            <Link href="/cuenta/pedidos">
               <ArrowLeft className="h-4 w-4" />
-              Volver a mi cuenta
+              Volver a mis pedidos
             </Link>
           </Button>
         </div>

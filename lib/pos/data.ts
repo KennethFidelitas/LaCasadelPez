@@ -128,8 +128,7 @@ export async function getSalesDashboardData(): Promise<{
 
   const { data: orderItems, error: orderItemsError } = await supabase
     .from('order_items')
-    .select('product_id, name, sku, quantity, total')
-    .not('product_id', 'is', null)
+    .select('id, order_id, product_id, name, sku, quantity, unit_price, total')
 
   if (orderItemsError) {
     throw new Error(orderItemsError.message)
@@ -142,13 +141,32 @@ export async function getSalesDashboardData(): Promise<{
   )
 
   const topProductsMap = new Map<string, PosTopProduct>()
+  const itemsByOrderId = new Map<string, PosSaleRecord['items']>()
   for (const item of (orderItems ?? []) as Array<{
+    id: string
+    order_id: string
     product_id: string | null
     name: string | null
     sku: string | null
     quantity: number | null
+    unit_price: number | null
     total: number | null
   }>) {
+    const lineItem = {
+      id: item.id,
+      productId: item.product_id,
+      name: item.name ?? 'Producto desconocido',
+      sku: item.sku ?? 'SIN-SKU',
+      quantity: Number(item.quantity ?? 0),
+      unitPrice: Number(item.unit_price ?? 0),
+      total: Number(item.total ?? 0),
+    }
+
+    itemsByOrderId.set(item.order_id, [
+      ...(itemsByOrderId.get(item.order_id) ?? []),
+      lineItem,
+    ])
+
     if (!item.product_id) continue
 
     const current = topProductsMap.get(item.product_id) ?? {
@@ -195,6 +213,7 @@ export async function getSalesDashboardData(): Promise<{
       paymentMethod: mapPaymentMethod(transaction?.payment_method),
       createdAt: order.created_at,
       transactionNumber: transaction?.transaction_number ?? null,
+      items: itemsByOrderId.get(order.id) ?? [],
     } satisfies PosSaleRecord
   })
 
