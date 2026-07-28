@@ -67,8 +67,12 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
     const paidSales = filteredSales.filter(
       (sale) => sale.paymentStatus === 'Pagado' && sale.status !== 'Cancelado',
     )
+    const pendingPaymentSales = filteredSales.filter(
+      (sale) => sale.paymentStatus === 'Pendiente' && sale.status !== 'Cancelado',
+    )
     const grossSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0)
     const confirmedSales = paidSales.reduce((sum, sale) => sum + sale.total, 0)
+    const pendingPaymentAmount = pendingPaymentSales.reduce((sum, sale) => sum + sale.total, 0)
     const itemCount = filteredSales.reduce(
       (sum, sale) => sum + (sale.items ?? []).reduce((itemSum, item) => itemSum + item.quantity, 0),
       0,
@@ -77,9 +81,61 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
     return {
       grossSales,
       confirmedSales,
+      pendingPaymentAmount,
       transactions: filteredSales.length,
+      paidTransactions: paidSales.length,
       averageTicket: paidSales.length > 0 ? confirmedSales / paidSales.length : 0,
       itemCount,
+    }
+  }, [filteredSales])
+
+  const commercialBreakdown = useMemo(() => {
+    const channelTotals = new Map<string, { count: number; total: number }>()
+    const paymentMethodTotals = new Map<string, { count: number; total: number }>()
+    const productTotals = new Map<string, { name: string; sku: string | null; quantity: number; total: number }>()
+
+    filteredSales.forEach((sale) => {
+      const channelCurrent = channelTotals.get(sale.channel) ?? { count: 0, total: 0 }
+      channelTotals.set(sale.channel, {
+        count: channelCurrent.count + 1,
+        total: channelCurrent.total + sale.total,
+      })
+
+      const method = sale.paymentMethod || 'No definido'
+      const methodCurrent = paymentMethodTotals.get(method) ?? { count: 0, total: 0 }
+      paymentMethodTotals.set(method, {
+        count: methodCurrent.count + 1,
+        total: methodCurrent.total + sale.total,
+      })
+
+      const saleItems = sale.items ?? []
+      saleItems.forEach((item) => {
+        const key = item.sku || item.name
+        const current = productTotals.get(key) ?? {
+          name: item.name,
+          sku: item.sku,
+          quantity: 0,
+          total: 0,
+        }
+
+        productTotals.set(key, {
+          ...current,
+          quantity: current.quantity + item.quantity,
+          total: current.total + item.total,
+        })
+      })
+    })
+
+    return {
+      channels: Array.from(channelTotals.entries())
+        .map(([label, value]) => ({ label, ...value }))
+        .sort((a, b) => b.total - a.total),
+      paymentMethods: Array.from(paymentMethodTotals.entries())
+        .map(([label, value]) => ({ label, ...value }))
+        .sort((a, b) => b.total - a.total),
+      topProducts: Array.from(productTotals.values())
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5),
     }
   }, [filteredSales])
 
@@ -226,6 +282,13 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
             <ReportMetric label="Ventas pagadas" value={formatPrice(totals.confirmedSales)} />
             <ReportMetric label="Transacciones" value={String(totals.transactions)} />
             <ReportMetric label="Ticket promedio" value={formatPrice(totals.averageTicket)} />
+            <ReportMetric label="Unidades vendidas" value={String(totals.itemCount)} />
+            <ReportMetric label="Operaciones pagadas" value={String(totals.paidTransactions)} />
+            <ReportMetric label="Pendiente de cobro" value={formatPrice(totals.pendingPaymentAmount)} />
+            <ReportMetric
+              label="Canal principal"
+              value={commercialBreakdown.channels[0]?.label ?? 'Sin ventas'}
+            />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -395,6 +458,36 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
           )}
         </CardContent>
       </Card>
+
+      <section className="grid gap-6 xl:grid-cols-3">
+        <ReportBreakdownCard
+          title="Ventas por canal"
+          emptyMessage="No hay canales para el filtro actual."
+          rows={commercialBreakdown.channels.map((row) => ({
+            label: row.label,
+            detail: `${row.count} venta(s)`,
+            value: formatPrice(row.total),
+          }))}
+        />
+        <ReportBreakdownCard
+          title="Métodos de pago"
+          emptyMessage="No hay métodos para el filtro actual."
+          rows={commercialBreakdown.paymentMethods.map((row) => ({
+            label: row.label,
+            detail: `${row.count} operación(es)`,
+            value: formatPrice(row.total),
+          }))}
+        />
+        <ReportBreakdownCard
+          title="Top productos"
+          emptyMessage="No hay productos en el filtro actual."
+          rows={commercialBreakdown.topProducts.map((row) => ({
+            label: row.name,
+            detail: `${row.sku ?? 'SIN-SKU'} · ${row.quantity} unidad(es)`,
+            value: formatPrice(row.total),
+          }))}
+        />
+      </section>
     </section>
   )
 }
@@ -414,5 +507,40 @@ function ReportMetric({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 font-mono text-lg font-semibold text-foreground">{value}</p>
     </div>
+  )
+}
+
+function ReportBreakdownCard({
+  title,
+  rows,
+  emptyMessage,
+}: {
+  title: string
+  rows: Array<{ label: string; detail: string; value: string }>
+  emptyMessage: string
+}) {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          rows.map((row) => (
+            <div key={`${row.label}-${row.detail}`} className="rounded-lg border p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{row.label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{row.detail}</p>
+                </div>
+                <p className="font-mono text-sm font-semibold">{row.value}</p>
+              </div>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
   )
 }
