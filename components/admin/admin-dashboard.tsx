@@ -1396,19 +1396,7 @@ async function sendTestEmail() {
                         </Link>
                       </Button>
                       <Button variant="outline" asChild>
-                        <Link href="/mortalidad">Gráficos mortalidad</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
                         <Link href="/stock-minimo">Stock mínimo</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/reporte-mortalidad">Reporte mortalidad</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/imprimir-reporte">
-                          <Printer className="h-4 w-4" />
-                          Imprimir Reporte
-                        </Link>
                       </Button>
                       <Button variant="outline" asChild>
                         <Link href="/inventario/registro-entrada">
