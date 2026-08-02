@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   Activity,
@@ -41,6 +41,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { GestionApartados } from '@/components/admin/GestionApartados'
+import { DialogoAjusteStock } from '@/components/inventario/dialogo-ajuste-stock'
 import { PaymentProofValidator } from '@/components/admin/PaymentProofValidator'
 import { OrderHistoryPanel } from '@/components/admin/order-history-panel'
 import { SalesDetailedReport } from '@/components/admin/sales-detailed-report'
@@ -63,6 +64,7 @@ import { DashboardAlertConfig } from '@/components/admin/DashboardAlertConfig'
 import {
   type AlertConfig,
   type AlertKey,
+  DEFAULT_ALERT_CONFIGS,
   loadAlertConfig,
 } from '@/lib/dashboard-alerts-config'
 import { formatDateTime, formatPrice } from '@/lib/format'
@@ -207,10 +209,11 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
   const [activeOrdersTab, setActiveOrdersTab] = useState<'comprobantes' | 'historial'>('comprobantes')
-  const [alertConfigs, setAlertConfigs] = useState<AlertConfig[]>(() => {
-    if (typeof window === 'undefined') return []
-    return loadAlertConfig()
-  })
+  const [alertConfigs, setAlertConfigs] = useState<AlertConfig[]>(DEFAULT_ALERT_CONFIGS)
+
+  useEffect(() => {
+    setAlertConfigs(loadAlertConfig())
+  }, [])
 
   function isAlertEnabled(key: AlertKey): boolean {
     const cfg = alertConfigs.find(c => c.key === key)
@@ -225,7 +228,7 @@ export function AdminDashboard({
     }
   }, [])
 
-  useEffect(() => {
+  const cargarInventario = useCallback(async () => {
     type AnimalRow = {
       id: string
       name: string
@@ -235,39 +238,39 @@ export function AdminDashboard({
       inventory: { quantity: number; location: string | null; low_stock_threshold: number }[] | null
     }
 
-    async function cargarInventario() {
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('animals')
-          .select('id, name, sku, cost, care_level, inventory(quantity, location, low_stock_threshold)')
-          .eq('is_active', true)
-          .order('name', { ascending: true })
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('animals')
+        .select('id, name, sku, cost, care_level, inventory(quantity, location, low_stock_threshold)')
+        .eq('is_active', true)
+        .order('name', { ascending: true })
 
-        if (error) throw error
+      if (error) throw error
 
-        const items: InventoryItem[] = ((data ?? []) as AnimalRow[]).map((a) => ({
-          id: a.id,
-          name: a.name,
-          sku: a.sku,
-          category: a.care_level ?? '—',
-          stock: a.inventory?.[0]?.quantity ?? 0,
-          min: a.inventory?.[0]?.low_stock_threshold ?? 5,
-          location: a.inventory?.[0]?.location ?? '—',
-          cost: a.cost ?? 0,
-        }))
+      const items: InventoryItem[] = ((data ?? []) as AnimalRow[]).map((a) => ({
+        id: a.id,
+        name: a.name,
+        sku: a.sku,
+        category: a.care_level ?? '—',
+        stock: a.inventory?.[0]?.quantity ?? 0,
+        min: a.inventory?.[0]?.low_stock_threshold ?? 5,
+        location: a.inventory?.[0]?.location ?? '—',
+        cost: a.cost ?? 0,
+      }))
 
-        setInventoryItems(items)
-      } catch (err) {
-        console.error('Error al cargar inventario:', err)
-        setInventoryItems(initialInventory)
-      } finally {
-        setInventarioLoading(false)
-      }
+      setInventoryItems(items)
+    } catch (err) {
+      console.error('Error al cargar inventario:', err)
+      setInventoryItems(initialInventory)
+    } finally {
+      setInventarioLoading(false)
     }
-
-    cargarInventario()
   }, [])
+
+  useEffect(() => {
+    cargarInventario()
+  }, [cargarInventario])
   const [discount, setDiscount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState<
   'efectivo' | 'tarjeta' | 'credito' | 'mixto'
@@ -585,14 +588,6 @@ export function AdminDashboard({
         }
       })()
     })
-  }
-
-  function adjustInventory(id: string, delta: number) {
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, stock: Math.max(0, item.stock + delta) } : item,
-      ),
-    )
   }
 
   function handleCustomerFieldChange(field: keyof typeof initialCustomerForm, value: string) {
@@ -1396,29 +1391,7 @@ async function sendTestEmail() {
                         </Link>
                       </Button>
                       <Button variant="outline" asChild>
-                        <Link href="/mortalidad">Gráficos mortalidad</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
                         <Link href="/stock-minimo">Stock mínimo</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/reporte-mortalidad">Reporte mortalidad</Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/imprimir-reporte">
-                          <Printer className="h-4 w-4" />
-                          Imprimir Reporte
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/registro-entrada">
-                          Registrar Entrada
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/registro-muerte">
-                          Registrar Baja
-                        </Link>
                       </Button>
                     </div>
                   </div>                  
@@ -1434,6 +1407,9 @@ async function sendTestEmail() {
                           className="pl-9"
                         />
                       </div>
+                      <Button variant="outline" size="icon" className="ml-auto">
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
 
                     <Table>
@@ -1478,14 +1454,15 @@ async function sendTestEmail() {
                             <TableCell>{item.min}</TableCell>
                             <TableCell>{formatPrice(item.cost)}</TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Button size="icon-sm" variant="outline" onClick={() => adjustInventory(item.id, -1)}>
-                                  <Minus className="h-4 w-4" />
-                                </Button>
-                                <Button size="icon-sm" variant="outline" onClick={() => adjustInventory(item.id, 1)}>
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              <DialogoAjusteStock
+                                animal={{
+                                  id: item.id,
+                                  name: item.name,
+                                  sku: item.sku,
+                                  stock: item.stock,
+                                }}
+                                onAjusteRealizado={cargarInventario}
+                              />
                             </TableCell>
                             <TableCell>
                               <Button size="icon-sm" variant="outline" asChild>
