@@ -42,6 +42,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { GestionApartados } from '@/components/admin/GestionApartados'
 import { DialogoAjusteStock } from '@/components/inventario/dialogo-ajuste-stock'
+import { DialogoSelectorTipoAlta } from '@/components/inventario/dialogo-selector-tipo-alta'
 import { PaymentProofValidator } from '@/components/admin/PaymentProofValidator'
 import { OrderHistoryPanel } from '@/components/admin/order-history-panel'
 import { SalesDetailedReport } from '@/components/admin/sales-detailed-report'
@@ -52,6 +53,11 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/overlays/dialog'
+import {
+  Tooltip as UiTooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/overlays/tooltip'
 import { Progress } from '@/components/ui/display/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import { Input } from '@/components/ui/forms/input'
@@ -103,6 +109,7 @@ type CartItem = PosProduct & {
 
 type InventoryItem = {
   id: string
+  type: 'animal' | 'product'
   name: string
   sku: string
   category: string
@@ -139,11 +146,11 @@ const modules = [
 }>
 
 const initialInventory: InventoryItem[] = [
-  { id: 'i1', name: 'Acuario 80L', sku: 'ACU-080', category: 'Peceras', stock: 4, min: 3, location: 'Bodega A', cost: 162000 },
-  { id: 'i2', name: 'Filtro Canister 1200', sku: 'FIL-1200', category: 'Filtracion', stock: 7, min: 5, location: 'Bodega B', cost: 89000 },
-  { id: 'i3', name: 'Termometro Digital', sku: 'TMP-DIG', category: 'Temperatura', stock: 2, min: 6, location: 'Mostrador', cost: 4500 },
-  { id: 'i4', name: 'Betta Halfmoon', sku: 'PZ-BET', category: 'Peces', stock: 3, min: 4, location: 'Area viva', cost: 7000 },
-  { id: 'i5', name: 'Alimento Premium', sku: 'ALI-PRM', category: 'Alimento', stock: 15, min: 8, location: 'Bodega C', cost: 8200 },
+  { id: 'i1', type: 'product', name: 'Acuario 80L', sku: 'ACU-080', category: 'Peceras', stock: 4, min: 3, location: 'Bodega A', cost: 162000 },
+  { id: 'i2', type: 'product', name: 'Filtro Canister 1200', sku: 'FIL-1200', category: 'Filtracion', stock: 7, min: 5, location: 'Bodega B', cost: 89000 },
+  { id: 'i3', type: 'product', name: 'Termometro Digital', sku: 'TMP-DIG', category: 'Temperatura', stock: 2, min: 6, location: 'Mostrador', cost: 4500 },
+  { id: 'i4', type: 'animal', name: 'Betta Halfmoon', sku: 'PZ-BET', category: 'Peces', stock: 3, min: 4, location: 'Area viva', cost: 7000 },
+  { id: 'i5', type: 'product', name: 'Alimento Premium', sku: 'ALI-PRM', category: 'Alimento', stock: 15, min: 8, location: 'Bodega C', cost: 8200 },
 ]
 
 const productionQueue: ProductionItem[] = [
@@ -229,35 +236,54 @@ export function AdminDashboard({
   }, [])
 
   const cargarInventario = useCallback(async () => {
-    type AnimalRow = {
+    type CatalogRow = {
       id: string
       name: string
       sku: string
       cost: number | null
-      care_level: string | null
+      category: { name: string } | null
       inventory: { quantity: number; location: string | null; low_stock_threshold: number }[] | null
+    }
+
+    const SELECT_CATALOG_ITEM =
+      'id, name, sku, cost, category:categories(name), inventory(quantity, location, low_stock_threshold)'
+
+    function mapCatalogRow(type: InventoryItem['type']) {
+      return (row: CatalogRow): InventoryItem => ({
+        id: row.id,
+        type,
+        name: row.name,
+        sku: row.sku,
+        category: row.category?.name ?? '—',
+        stock: row.inventory?.[0]?.quantity ?? 0,
+        min: row.inventory?.[0]?.low_stock_threshold ?? 5,
+        location: row.inventory?.[0]?.location ?? '—',
+        cost: row.cost ?? 0,
+      })
     }
 
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('animals')
-        .select('id, name, sku, cost, care_level, inventory(quantity, location, low_stock_threshold)')
-        .eq('is_active', true)
-        .order('name', { ascending: true })
+      const [animalsRes, productsRes] = await Promise.all([
+        supabase
+          .from('animals')
+          .select(SELECT_CATALOG_ITEM)
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
+        supabase
+          .from('products')
+          .select(SELECT_CATALOG_ITEM)
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
+      ])
 
-      if (error) throw error
+      if (animalsRes.error) throw animalsRes.error
+      if (productsRes.error) throw productsRes.error
 
-      const items: InventoryItem[] = ((data ?? []) as AnimalRow[]).map((a) => ({
-        id: a.id,
-        name: a.name,
-        sku: a.sku,
-        category: a.care_level ?? '—',
-        stock: a.inventory?.[0]?.quantity ?? 0,
-        min: a.inventory?.[0]?.low_stock_threshold ?? 5,
-        location: a.inventory?.[0]?.location ?? '—',
-        cost: a.cost ?? 0,
-      }))
+      const items: InventoryItem[] = [
+        ...((animalsRes.data ?? []) as unknown as CatalogRow[]).map(mapCatalogRow('animal')),
+        ...((productsRes.data ?? []) as unknown as CatalogRow[]).map(mapCatalogRow('product')),
+      ].sort((a, b) => a.name.localeCompare(b.name))
 
       setInventoryItems(items)
     } catch (err) {
@@ -1381,16 +1407,6 @@ async function sendTestEmail() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <Button variant="outline" asChild>
-                        <Link href="/inventario/agregar-animal">
-                          Agregar Nuevo Animal
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/consultar-animales">
-                          Consultar Inventario
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
                         <Link href="/stock-minimo">Stock mínimo</Link>
                       </Button>
                     </div>
@@ -1407,9 +1423,7 @@ async function sendTestEmail() {
                           className="pl-9"
                         />
                       </div>
-                      <Button variant="outline" size="icon" className="ml-auto">
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      <DialogoSelectorTipoAlta />
                     </div>
 
                     <Table>
@@ -1455,8 +1469,9 @@ async function sendTestEmail() {
                             <TableCell>{formatPrice(item.cost)}</TableCell>
                             <TableCell>
                               <DialogoAjusteStock
-                                animal={{
+                                item={{
                                   id: item.id,
+                                  type: item.type,
                                   name: item.name,
                                   sku: item.sku,
                                   stock: item.stock,
@@ -1465,11 +1480,24 @@ async function sendTestEmail() {
                               />
                             </TableCell>
                             <TableCell>
-                              <Button size="icon-sm" variant="outline" asChild>
-                                <Link href={`/inventario/modificar-lote/${item.id}`}>
-                                  <Pencil className="h-4 w-4" />
-                                </Link>
-                              </Button>
+                              {item.type === 'animal' ? (
+                                <Button size="icon-sm" variant="outline" asChild>
+                                  <Link href={`/inventario/modificar-lote/${item.id}`}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <UiTooltip>
+                                  <TooltipTrigger asChild>
+                                    <span tabIndex={0} className="inline-block">
+                                      <Button size="icon-sm" variant="outline" disabled>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Próximamente</TooltipContent>
+                                </UiTooltip>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
