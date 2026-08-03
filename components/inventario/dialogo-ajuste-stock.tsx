@@ -60,9 +60,12 @@ interface ItemAjustable {
 interface DialogoAjusteStockProps {
   item: ItemAjustable
   onAjusteRealizado?: () => void
+  /** Trigger custom (ej. un link "Ajustar stock →" en un formulario de edición).
+   *  Si no se pasa, usa el botón "Stock" de siempre. */
+  trigger?: React.ReactNode
 }
 
-export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteStockProps) {
+export function DialogoAjusteStock({ item, onAjusteRealizado, trigger }: DialogoAjusteStockProps) {
   const [open, setOpen] = useState(false)
   const [tipo, setTipo] = useState<TipoAjuste>('entrada')
 
@@ -179,10 +182,12 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Boxes className="h-4 w-4" />
-          Stock
-        </Button>
+        {trigger ?? (
+          <Button size="sm" variant="outline">
+            <Boxes className="h-4 w-4" />
+            Stock
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

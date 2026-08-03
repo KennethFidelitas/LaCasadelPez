@@ -53,11 +53,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/overlays/dialog'
-import {
-  Tooltip as UiTooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/overlays/tooltip'
 import { Progress } from '@/components/ui/display/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 import { Input } from '@/components/ui/forms/input'
@@ -1480,24 +1475,17 @@ async function sendTestEmail() {
                               />
                             </TableCell>
                             <TableCell>
-                              {item.type === 'animal' ? (
-                                <Button size="icon-sm" variant="outline" asChild>
-                                  <Link href={`/inventario/modificar-lote/${item.id}`}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Link>
-                                </Button>
-                              ) : (
-                                <UiTooltip>
-                                  <TooltipTrigger asChild>
-                                    <span tabIndex={0} className="inline-block">
-                                      <Button size="icon-sm" variant="outline" disabled>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Próximamente</TooltipContent>
-                                </UiTooltip>
-                              )}
+                              <Button size="icon-sm" variant="outline" asChild>
+                                <Link
+                                  href={
+                                    item.type === 'animal'
+                                      ? `/inventario/modificar-lote/${item.id}`
+                                      : `/inventario/editar-producto/${item.id}`
+                                  }
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}

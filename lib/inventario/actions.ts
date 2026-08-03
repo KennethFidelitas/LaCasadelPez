@@ -8,6 +8,7 @@ import {
   type RegistroMuerteValues,
   type SalidaProductoValues,
   type ProductoValues,
+  type EditarProductoValues,
 } from './schemas'
 
 export type RegistrarEntradaInventarioInput = EntradaItemValues & {
@@ -367,6 +368,141 @@ export async function crearProducto(
     }
 
     return { success: true, productId: producto.id }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// ─── Edición de producto ───────────────────────────────────────────────────────
+// A propósito NO recibe ni toca `quantity` — el stock solo se modifica desde
+// el modal de Stock (registrarEntradaInventario/registrarSalidaProducto), para
+// no perder el rastro de auditoría en inventory_entries. slug y sku tampoco se
+// tocan (se autogeneran una sola vez, al crear).
+
+export async function actualizarProducto(
+  productId: string,
+  input: EditarProductoValues,
+  newImages: File[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+
+    // 1. Obtener la fila de inventory del producto (para saber su id)
+    const { data: inventario, error: errorInventario } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('product_id', productId)
+      .single()
+
+    if (errorInventario) {
+      return { success: false, error: 'No se encontró el inventario del producto.' }
+    }
+
+    // 2. Validar imágenes nuevas (mismas reglas que crearProducto)
+    if (newImages.length > MAX_PRODUCT_IMAGES) {
+      return { success: false, error: `Puede cargar un máximo de ${MAX_PRODUCT_IMAGES} imágenes.` }
+    }
+    for (const image of newImages) {
+      if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(image.type)) {
+        return { success: false, error: 'Las imágenes deben ser JPG, PNG o WEBP.' }
+      }
+      if (image.size > MAX_PRODUCT_IMAGE_SIZE) {
+        return {
+          success: false,
+          error: `Cada imagen puede pesar como máximo ${MAX_PRODUCT_IMAGE_SIZE / 1024 / 1024} MB.`,
+        }
+      }
+    }
+
+    // 3. Si hay imágenes nuevas, subirlas y reemplazar el array completo
+    //    (mismo comportamiento que modificar-lote/[id] para animales — el
+    //    manejo granular de agregar/quitar individualmente queda para otra
+    //    sesión). Si no se seleccionó ninguna, las imágenes actuales quedan
+    //    intactas (no se tocan en el UPDATE).
+    let imageUrls: string[] | undefined
+    const uploadedPaths: string[] = []
+
+    if (newImages.length) {
+      const slug = slugify(`producto-${productId}`)
+      const { data: bucket, error: getBucketError } = await supabase.storage.getBucket(PRODUCT_IMAGES_BUCKET)
+      if (getBucketError && !getBucketError.message.toLowerCase().includes('not found')) {
+        return {
+          success: false,
+          error: `No se pudo conectar con el almacenamiento de imágenes: ${getBucketError.message}`,
+        }
+      }
+
+      if (!bucket) {
+        const { error: bucketError } = await supabase.storage.createBucket(PRODUCT_IMAGES_BUCKET, {
+          public: true,
+          allowedMimeTypes: [...ALLOWED_PRODUCT_IMAGE_TYPES],
+          fileSizeLimit: MAX_PRODUCT_IMAGE_SIZE,
+        })
+        if (bucketError && !bucketError.message.toLowerCase().includes('already exists')) {
+          return {
+            success: false,
+            error: `No se pudo preparar el almacenamiento de imágenes: ${bucketError.message}`,
+          }
+        }
+      }
+
+      imageUrls = []
+      for (const [index, image] of newImages.entries()) {
+        const path = `${slug}/${crypto.randomUUID()}-${index}.${productImageExtension(image)}`
+        const { error: uploadError } = await supabase.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .upload(path, await image.arrayBuffer(), { contentType: image.type, upsert: false })
+
+        if (uploadError) {
+          if (uploadedPaths.length) {
+            await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(uploadedPaths)
+          }
+          return { success: false, error: `No se pudo cargar la imagen "${image.name}": ${uploadError.message}` }
+        }
+
+        uploadedPaths.push(path)
+        const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path)
+        imageUrls.push(data.publicUrl)
+      }
+    }
+
+    // 4. Actualizar products (sin slug/sku/quantity)
+    const { error: errorProducto } = await supabase
+      .from('products')
+      .update({
+        name: input.name,
+        brand: input.brand || null,
+        description: input.description,
+        category_id: input.category_id,
+        price: input.price,
+        cost: input.cost,
+        is_featured: input.is_featured,
+        ...(imageUrls ? { images: imageUrls } : {}),
+      })
+      .eq('id', productId)
+
+    if (errorProducto) {
+      if (uploadedPaths.length) {
+        await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(uploadedPaths)
+      }
+      return { success: false, error: `Error al actualizar el producto: ${errorProducto.message}` }
+    }
+
+    // 5. Actualizar inventory — solo location y low_stock_threshold, NUNCA quantity
+    const { error: errorInventarioUpdate } = await supabase
+      .from('inventory')
+      .update({
+        location: input.location,
+        low_stock_threshold: input.low_stock_threshold ?? 5,
+      })
+      .eq('id', inventario.id)
+
+    if (errorInventarioUpdate) {
+      return { success: false, error: `Error al actualizar el inventario: ${errorInventarioUpdate.message}` }
+    }
+
+    return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }
