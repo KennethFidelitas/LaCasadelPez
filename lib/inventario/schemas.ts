@@ -151,3 +151,12 @@ export type ProductoValues = z.infer<typeof productoSchema>
 // por consistencia; si se quiere resolver, la opción natural es escribir una
 // fila inicial en inventory_entries (entry_type='entrada') al crear el
 // producto, no agregada acá porque no estaba en el alcance pedido.
+
+// ─── Edición de producto ───────────────────────────────────────────────────────
+// Mismos campos que productoSchema, sin quantity: el stock nunca se edita
+// desde este formulario, solo desde el modal de Stock (Entrada/Salida), para
+// no perder el rastro de auditoría en inventory_entries.
+
+export const editarProductoSchema = productoSchema.omit({ quantity: true })
+
+export type EditarProductoValues = z.infer<typeof editarProductoSchema>

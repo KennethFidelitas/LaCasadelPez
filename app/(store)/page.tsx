@@ -128,7 +128,7 @@ export default async function HomePage() {
                 <Award className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">+10 Anos de Experiencia</h3>
+                <h3 className="font-semibold text-foreground">+10 Años de Experiencia</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Asesoría profesional para tu acuario
                 </p>
