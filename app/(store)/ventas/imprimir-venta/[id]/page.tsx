@@ -201,7 +201,7 @@ export default function ImprimirVentaPage() {
           <h1 className="text-2xl font-bold">LA CASA DEL PEZ</h1>
           <p className="text-sm text-slate-600">Tienda de Acuariofilia</p>
           <p className="mt-2 text-xs text-slate-500">
-            Teléfono: +506 XXXX-XXXX | info@lacasadelpez.com
+            Teléfono: +506 XXXX-XXXX | admin@lacasadelpez.com
           </p>
         </div>
 
