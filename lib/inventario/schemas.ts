@@ -72,3 +72,43 @@ export const registroMuerteSchema = z.object({
 })
 
 export type RegistroMuerteValues = z.infer<typeof registroMuerteSchema>
+
+// ─── Salida de productos (modal "Ajustar stock") ──────────────────────────────
+// Equivalente a registroMuerteSchema pero para productos: no hay evento
+// biológico (no usa animal_mortality), se registra como movimiento en
+// inventory_entries con entry_type='salida' (scripts/012_...).
+
+export const MOTIVOS_SALIDA_PRODUCTO = [
+  'danado',
+  'vencido',
+  'extraviado',
+  'devolucion_proveedor',
+  'uso_interno',
+  'ajuste_conteo',
+] as const
+
+export const MOTIVO_SALIDA_PRODUCTO_LABELS: Record<typeof MOTIVOS_SALIDA_PRODUCTO[number], string> = {
+  danado: 'Dañado',
+  vencido: 'Vencido',
+  extraviado: 'Extraviado',
+  devolucion_proveedor: 'Devolución a proveedor',
+  uso_interno: 'Uso interno',
+  ajuste_conteo: 'Ajuste de conteo',
+}
+
+export const salidaProductoSchema = z.object({
+  quantity: z.coerce
+    .number({ invalid_type_error: 'Ingresa una cantidad' })
+    .int()
+    .positive('La cantidad debe ser mayor a 0'),
+  recorded_at: z.string({ required_error: 'La fecha es requerida' }).min(1, 'La fecha es requerida'),
+  reason: z.enum(MOTIVOS_SALIDA_PRODUCTO, { required_error: 'Selecciona un motivo' }),
+  notes: z.string().max(1000).optional(),
+})
+
+export type SalidaProductoValues = z.infer<typeof salidaProductoSchema>
+
+// Nota: "no mayor al stock" no se valida acá (el stock disponible es dinámico
+// por ítem, no algo que el schema estático pueda conocer) — se valida igual
+// que en registroMuerteSchema/registrarMuerteAnimal: guardia en el cliente
+// (dialogo-ajuste-stock.tsx) + validación server-side en registrarSalidaProducto.

@@ -13,8 +13,16 @@ import {
   type RegistroMuerteValues,
   CAUSAS_MUERTE,
   CAUSA_MUERTE_LABELS,
+  salidaProductoSchema,
+  type SalidaProductoValues,
+  MOTIVOS_SALIDA_PRODUCTO,
+  MOTIVO_SALIDA_PRODUCTO_LABELS,
 } from '@/lib/inventario/schemas'
-import { registrarEntradaInventario, registrarMuerteAnimal } from '@/lib/inventario/actions'
+import {
+  registrarEntradaInventario,
+  registrarMuerteAnimal,
+  registrarSalidaProducto,
+} from '@/lib/inventario/actions'
 
 import { Button } from '@/components/ui/actions/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/actions/toggle-group'
@@ -76,6 +84,13 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
     notes: '',
   }
 
+  const salidaProductoDefaults: SalidaProductoValues = {
+    quantity: '' as unknown as number,
+    recorded_at: today,
+    reason: undefined as unknown as SalidaProductoValues['reason'],
+    notes: '',
+  }
+
   const entradaForm = useForm<EntradaItemValues>({
     resolver: zodResolver(entradaItemSchema),
     defaultValues: entradaDefaults,
@@ -86,7 +101,13 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
     defaultValues: bajaDefaults,
   })
 
+  const salidaProductoForm = useForm<SalidaProductoValues>({
+    resolver: zodResolver(salidaProductoSchema),
+    defaultValues: salidaProductoDefaults,
+  })
+
   const cantidadBaja = bajaForm.watch('quantity')
+  const cantidadSalidaProducto = salidaProductoForm.watch('quantity')
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
@@ -94,6 +115,7 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
       setTipo('entrada')
       entradaForm.reset(entradaDefaults)
       bajaForm.reset(bajaDefaults)
+      salidaProductoForm.reset(salidaProductoDefaults)
     }
   }
 
@@ -129,7 +151,30 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
     handleOpenChange(false)
   }
 
-  const isSubmitting = entradaForm.formState.isSubmitting || bajaForm.formState.isSubmitting
+  async function onSubmitSalidaProducto(values: SalidaProductoValues) {
+    if (values.quantity > item.stock) {
+      salidaProductoForm.setError('quantity', {
+        message: `La cantidad no puede superar el stock actual (${item.stock})`,
+      })
+      return
+    }
+
+    const result = await registrarSalidaProducto({ ...values, productId: item.id })
+
+    if (!result.success) {
+      toast.error(result.error ?? 'No se pudo registrar la salida')
+      return
+    }
+
+    toast.success('Salida registrada correctamente')
+    onAjusteRealizado?.()
+    handleOpenChange(false)
+  }
+
+  const isSubmitting =
+    entradaForm.formState.isSubmitting ||
+    bajaForm.formState.isSubmitting ||
+    salidaProductoForm.formState.isSubmitting
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -176,7 +221,6 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
             </ToggleGroupItem>
             <ToggleGroupItem
               value="baja"
-              disabled={item.type === 'product'}
               className="h-auto flex-col gap-1 rounded-md py-3 data-[variant=outline]:border-l data-[state=on]:border-accent data-[state=on]:bg-accent/10 data-[state=on]:text-accent"
             >
               <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -271,7 +315,7 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
               />
             </div>
           </form>
-        ) : (
+        ) : item.type === 'animal' ? (
           <form
             id="form-ajuste-stock"
             onSubmit={bajaForm.handleSubmit(onSubmitBaja)}
@@ -356,6 +400,96 @@ export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteSto
                 placeholder="Observaciones sobre esta salida…"
                 rows={2}
                 {...bajaForm.register('notes')}
+              />
+            </div>
+          </form>
+        ) : (
+          <form
+            id="form-ajuste-stock"
+            onSubmit={salidaProductoForm.handleSubmit(onSubmitSalidaProducto)}
+            className="grid gap-4"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="salida-producto-quantity">
+                  Cantidad <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="salida-producto-quantity"
+                  type="number"
+                  min="1"
+                  max={item.stock}
+                  placeholder="Ej: 3"
+                  {...salidaProductoForm.register('quantity')}
+                  aria-invalid={!!salidaProductoForm.formState.errors.quantity}
+                />
+                {salidaProductoForm.formState.errors.quantity && (
+                  <p className="text-xs text-destructive">
+                    {salidaProductoForm.formState.errors.quantity.message}
+                  </p>
+                )}
+                {cantidadSalidaProducto > 0 && cantidadSalidaProducto > item.stock && (
+                  <p className="text-xs text-destructive">
+                    No puede superar el stock actual ({item.stock})
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="salida-producto-recorded-at">
+                  Fecha <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="salida-producto-recorded-at"
+                  type="date"
+                  max={today}
+                  {...salidaProductoForm.register('recorded_at')}
+                  aria-invalid={!!salidaProductoForm.formState.errors.recorded_at}
+                />
+                {salidaProductoForm.formState.errors.recorded_at && (
+                  <p className="text-xs text-destructive">
+                    {salidaProductoForm.formState.errors.recorded_at.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>
+                Motivo <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="reason"
+                control={salidaProductoForm.control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger aria-invalid={!!salidaProductoForm.formState.errors.reason} className="w-full">
+                      <SelectValue placeholder="Seleccionar motivo…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOTIVOS_SALIDA_PRODUCTO.map((motivo) => (
+                        <SelectItem key={motivo} value={motivo}>
+                          {MOTIVO_SALIDA_PRODUCTO_LABELS[motivo]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {salidaProductoForm.formState.errors.reason && (
+                <p className="text-xs text-destructive">
+                  {salidaProductoForm.formState.errors.reason.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="salida-producto-notes">Notas</Label>
+              <Textarea
+                id="salida-producto-notes"
+                placeholder="Observaciones sobre esta salida…"
+                rows={2}
+                {...salidaProductoForm.register('notes')}
               />
             </div>
           </form>
