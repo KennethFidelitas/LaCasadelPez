@@ -2,7 +2,8 @@
 
 import { Fish, ChevronDown } from 'lucide-react'
 import { ProductCard } from './ProductCard'
-import type { Producto, Ordenamiento } from './types'
+import type { Ordenamiento } from './types'
+import type { Animal } from '@/lib/types'
 
 const ORDEN_OPCIONES: { value: Ordenamiento; label: string }[] = [
   { value: 'relevancia', label: 'Relevancia' },
@@ -12,7 +13,7 @@ const ORDEN_OPCIONES: { value: Ordenamiento; label: string }[] = [
 ]
 
 interface ProductGridProps {
-  productos: Producto[]
+  productos: Animal[]
   ordenar: Ordenamiento
   onOrdenarChange: (ordenar: Ordenamiento) => void
   onLimpiarFiltros: () => void
@@ -70,8 +71,8 @@ export function ProductGrid({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          {productos.map(producto => (
-            <ProductCard key={producto.id} producto={producto} />
+          {productos.map(animal => (
+            <ProductCard key={animal.id} animal={animal} />
           ))}
         </div>
       )}

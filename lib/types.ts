@@ -66,6 +66,12 @@ export interface Animal {
   is_featured: boolean
   created_at: string
   updated_at: string
+  // No son columnas crudas de `animals` — se calculan al consultar (join a
+  // inventory / categories), mismo patrón que Product.stock_quantity/category.
+  category_id?: string | null
+  category?: Category
+  stock_quantity: number
+  low_stock_threshold: number
 }
 
 export interface Profile {
