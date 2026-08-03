@@ -56,10 +56,10 @@ export default async function HomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
               <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                Tu Mundo Acuatico Comienza Aqui
+                Tu Mundo Acuático Comienza Aquí
               </h1>
               <p className="mt-6 text-pretty text-lg text-muted-foreground">
-                Descubre nuestra amplia seleccion de peces tropicales, acuarios de alta calidad y todo lo que necesitas para crear el acuario de tus suenos. Expertos en acuarismo desde hace mas de 20 anos.
+                Descubre nuestra amplia selección de peces tropicales, acuarios de alta calidad y todo lo que necesitas para crear el acuario de tus sueños. Expertos en acuarismo desde hace mas de 10 años.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Button size="lg" asChild>
@@ -108,7 +108,7 @@ export default async function HomePage() {
               <div>
                 <h3 className="font-semibold text-foreground">Agua de Calidad</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Sistemas de filtracion y productos premium
+                  Sistemas de filtración y productos premium
                 </p>
               </div>
             </div>
@@ -119,7 +119,7 @@ export default async function HomePage() {
               <div>
                 <h3 className="font-semibold text-foreground">Acuarios a Medida</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Disenamos y fabricamos acuarios personalizados
+                  Diseñamos y fabricamos acuarios personalizados
                 </p>
               </div>
             </div>
@@ -128,9 +128,9 @@ export default async function HomePage() {
                 <Award className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">+20 Anos de Experiencia</h3>
+                <h3 className="font-semibold text-foreground">+10 Anos de Experiencia</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Asesoria profesional para tu acuario
+                  Asesoría profesional para tu acuario
                 </p>
               </div>
             </div>
@@ -144,10 +144,10 @@ export default async function HomePage() {
           <div className="flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Categorias
+                Categorías
               </h2>
               <p className="mt-2 text-muted-foreground">
-                Explora nuestras categorias de productos
+                Explora nuestras categorías de productos
               </p>
             </div>
             <Button variant="ghost" asChild>
@@ -193,7 +193,7 @@ export default async function HomePage() {
                 Peces Tropicales
               </h2>
               <p className="mt-2 text-muted-foreground">
-                Descubre nuestra coleccion de especies exoticas
+                Descubre nuestra colección de especies exóticas
               </p>
             </div>
             <Button variant="ghost" asChild>
@@ -215,8 +215,8 @@ export default async function HomePage() {
               Crea tu Acuario Ideal
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-              Utiliza nuestro configurador interactivo para disenar tu acuario a medida. 
-              Selecciona dimensiones, tipo de vidrio, acabados y recibe una cotizacion al instante.
+              Utiliza nuestro configurador interactivo para diseñar tu acuario a medida. 
+              Selecciona dimensiones, tipo de vidrio, acabados y recibe una cotización al instante.
             </p>
             <Button size="lg" className="mt-8" asChild>
               <Link href="/configurador">

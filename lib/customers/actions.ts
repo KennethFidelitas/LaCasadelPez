@@ -1,14 +1,34 @@
 'use server'
 
+import { randomBytes, randomInt } from 'crypto'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTemporaryPasswordEmail } from '@/lib/email/sender'
 
-function createTemporaryPassword(firstName: string, lastName: string) {
-  const base = `${firstName}${lastName || 'temp'}`.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const suffix = Math.random().toString(36).slice(-6)
-  return `${base.slice(0, 8)}A1!${suffix}`.slice(0, 16)
+// Genera una contraseña temporal aleatoria y segura (12 caracteres,
+// garantiza al menos una mayúscula, un número y un símbolo para pasar
+// las políticas de contraseña por defecto de Supabase Auth).
+function createTemporaryPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnopqrstuvwxyz'
+  const digits = '23456789'
+  const symbols = '!@#$%*?'
+  const all = upper + lower + digits + symbols
+
+  const pick = (chars: string) => chars[randomInt(chars.length)]
+
+  const required = [pick(upper), pick(lower), pick(digits), pick(symbols)]
+  const rest = Array.from(randomBytes(8)).map((byte) => all[byte % all.length])
+
+  const passwordChars = [...required, ...rest]
+  // Mezclar (Fisher-Yates) para que los caracteres requeridos no queden siempre al inicio.
+  for (let i = passwordChars.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1)
+    ;[passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]]
+  }
+
+  return passwordChars.join('')
 }
 
 const customerContactSchema = z
@@ -64,6 +84,10 @@ export async function createCustomerContact(input: unknown) {
 
   if (payload.email) {
     const customerEmail = payload.email.trim()
+    // Una sola contraseña temporal: es la que se usa para crear/actualizar la
+    // cuenta en Supabase Auth Y la que se envía por correo. Deben coincidir
+    // siempre, o el cliente recibe credenciales que no funcionan para loguearse.
+    const temporaryPassword = createTemporaryPassword()
 
     try {
       const adminSupabase = createAdminClient()
@@ -78,9 +102,19 @@ export async function createCustomerContact(input: unknown) {
       )
 
       if (existingAuthUser?.id) {
+        // El usuario ya existe en Auth: le reseteamos la contraseña a la nueva
+        // temporal para que el correo que reciba sea válido para loguearse.
+        const { error: updateUserError } = await adminSupabase.auth.admin.updateUserById(
+          existingAuthUser.id,
+          { password: temporaryPassword },
+        )
+
+        if (updateUserError) {
+          throw new Error(updateUserError.message || 'No se pudo actualizar la cuenta de autenticación del cliente.')
+        }
+
         authUserId = existingAuthUser.id
       } else {
-        const temporaryPassword = createTemporaryPassword(payload.firstName, payload.lastName || '')
         const { data: createdUser, error: createUserError } = await adminSupabase.auth.admin.createUser({
           email: customerEmail,
           password: temporaryPassword,
@@ -110,7 +144,6 @@ export async function createCustomerContact(input: unknown) {
           role: 'customer',
         }, { onConflict: 'id' })
 
-        const temporaryPassword = createTemporaryPassword(payload.firstName, payload.lastName || '')
         const emailResult = await sendTemporaryPasswordEmail({
           to: customerEmail,
           firstName: payload.firstName,
