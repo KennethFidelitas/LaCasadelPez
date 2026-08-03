@@ -112,3 +112,42 @@ export type SalidaProductoValues = z.infer<typeof salidaProductoSchema>
 // por ítem, no algo que el schema estático pueda conocer) — se valida igual
 // que en registroMuerteSchema/registrarMuerteAnimal: guardia en el cliente
 // (dialogo-ajuste-stock.tsx) + validación server-side en registrarSalidaProducto.
+
+// ─── Alta de producto ──────────────────────────────────────────────────────────
+// Independiente de cualquier schema de animal — no comparte forma con
+// registroEntradaSchema ni con el alta de animal (agregar-animal/page.tsx).
+
+export const productoSchema = z.object({
+  name: z.string().min(1, 'El nombre es requerido').max(200),
+  brand: z.string().max(200).optional(),
+  description: z.string().min(1, 'La descripción es requerida'),
+  category_id: z.string().uuid('Selecciona una categoría válida'),
+  price: z.coerce
+    .number({ invalid_type_error: 'Ingrese un precio válido' })
+    .min(0, 'El precio no puede ser negativo'),
+  cost: z.coerce
+    .number({ invalid_type_error: 'Ingrese un costo válido' })
+    .min(0, 'El costo no puede ser negativo'),
+  is_featured: z.boolean(),
+  quantity: z.coerce
+    .number({ invalid_type_error: 'Ingrese una cantidad válida' })
+    .int('La cantidad debe ser un número entero')
+    .positive('La cantidad debe ser mayor a 0'),
+  location: z.enum(UBICACIONES, { required_error: 'Selecciona una ubicación' }),
+  low_stock_threshold: z.coerce
+    .number({ invalid_type_error: 'Ingrese un número válido' })
+    .int()
+    .min(0, 'No puede ser negativo')
+    .optional(),
+  supplier: z.string().max(200).optional(),
+})
+
+export type ProductoValues = z.infer<typeof productoSchema>
+
+// Nota sobre "supplier": se recolecta en el formulario (igual que en el alta
+// de animal) pero hoy no se persiste en ninguna tabla — ni `products` ni
+// `inventory` tienen columna de proveedor, y agregar_animal/page.tsx tiene el
+// mismo campo sin usar en su acción actual. Se mantiene la misma limitación
+// por consistencia; si se quiere resolver, la opción natural es escribir una
+// fila inicial en inventory_entries (entry_type='entrada') al crear el
+// producto, no agregada acá porque no estaba en el alcance pedido.

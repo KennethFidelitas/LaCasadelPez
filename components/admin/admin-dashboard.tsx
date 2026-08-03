@@ -42,6 +42,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CreditManagement } from '@/components/admin/credit-management'
 import { GestionApartados } from '@/components/admin/GestionApartados'
 import { DialogoAjusteStock } from '@/components/inventario/dialogo-ajuste-stock'
+import { DialogoSelectorTipoAlta } from '@/components/inventario/dialogo-selector-tipo-alta'
 import { PaymentProofValidator } from '@/components/admin/PaymentProofValidator'
 import { OrderHistoryPanel } from '@/components/admin/order-history-panel'
 import { SalesDetailedReport } from '@/components/admin/sales-detailed-report'
@@ -1406,16 +1407,6 @@ async function sendTestEmail() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <Button variant="outline" asChild>
-                        <Link href="/inventario/agregar-animal">
-                          Agregar Nuevo Animal
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/inventario/consultar-animales">
-                          Consultar Inventario
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
                         <Link href="/stock-minimo">Stock mínimo</Link>
                       </Button>
                     </div>
@@ -1432,9 +1423,7 @@ async function sendTestEmail() {
                           className="pl-9"
                         />
                       </div>
-                      <Button variant="outline" size="icon" className="ml-auto">
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      <DialogoSelectorTipoAlta />
                     </div>
 
                     <Table>
