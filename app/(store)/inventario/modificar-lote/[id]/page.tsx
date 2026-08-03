@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { ArrowRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { DialogoAjusteStock } from "@/components/inventario/dialogo-ajuste-stock"
 
 export default function EditarAnimalPage() {
   const params = useParams()
@@ -15,39 +17,52 @@ export default function EditarAnimalPage() {
   const [saving, setSaving] = useState(false)
   const [selectedImages, setSelectedImages] = useState<File[]>([])
 
-  useEffect(() => {
+  const cargarDatos = useCallback(async () => {
     if (!animalId) return
 
-    const cargarDatos = async () => {
-      try {
-        const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-        // Cargar animal
-        const { data: animalData, error: animalError } = await supabase
-          .from("animals")
-          .select("*")
-          .eq("id", animalId)
-          .single()
+      // Cargar animal
+      const { data: animalData, error: animalError } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("id", animalId)
+        .single()
 
-        if (animalError) throw animalError
+      if (animalError) throw animalError
 
-        // Cargar inventario
-        const { data: inventarioData, error: inventarioError } = await supabase
-          .from("inventory")
-          .select("*")
-          .eq("animal_id", animalId)
-          .single()
+      // Cargar inventario
+      const { data: inventarioData, error: inventarioError } = await supabase
+        .from("inventory")
+        .select("*")
+        .eq("animal_id", animalId)
+        .single()
 
-        setAnimal(animalData)
-        setInventario(inventarioData)
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+      setAnimal(animalData)
+      setInventario(inventarioData)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
+  }, [animalId])
 
+  useEffect(() => {
     cargarDatos()
+  }, [cargarDatos])
+
+  // Refresco liviano tras un ajuste de stock: solo el inventario, sin
+  // reactivar el "Cargando..." de página completa que usa cargarDatos.
+  const refrescarInventario = useCallback(async () => {
+    if (!animalId) return
+    const supabase = createClient()
+    const { data: inventarioData } = await supabase
+      .from("inventory")
+      .select("*")
+      .eq("animal_id", animalId)
+      .single()
+    if (inventarioData) setInventario(inventarioData)
   }, [animalId])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -119,7 +134,6 @@ export default function EditarAnimalPage() {
         const { data: inventoryResult, error: errorInventario } = await supabase
           .from("inventory")
           .update({
-            quantity: Number(formData.get("cantidad")),
             location: formData.get("ubicacion"),
           })
           .eq("id", inventario.id)
@@ -436,16 +450,36 @@ export default function EditarAnimalPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium">
-                      Cantidad *
+                      Cantidad
                     </label>
-                    <input
-                      name="cantidad"
-                      type="number"
-                      min="0"
-                      defaultValue={inventario?.quantity || 0}
-                      required
-                      className="w-full rounded-md border px-3 py-2"
-                    />
+                    <div className="flex h-[38px] items-center justify-between gap-2 rounded-md border bg-gray-50 px-3 text-sm">
+                      <span>{inventario?.quantity ?? 0} unidades</span>
+                      {animal && (
+                        <DialogoAjusteStock
+                          item={{
+                            id: animalId,
+                            type: "animal",
+                            name: animal.name,
+                            sku: animal.sku,
+                            stock: inventario?.quantity ?? 0,
+                          }}
+                          onAjusteRealizado={refrescarInventario}
+                          trigger={
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-sm font-medium text-[#006f95] hover:underline"
+                            >
+                              Ajustar stock
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </button>
+                          }
+                        />
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      La cantidad solo se modifica desde "Ajustar stock", para mantener el
+                      historial de movimientos.
+                    </p>
                   </div>
 
                   <div>
