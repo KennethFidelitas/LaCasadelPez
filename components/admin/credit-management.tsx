@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Activity, Bell, CreditCard, FilePenLine, Search, Trash2, Wallet } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/actions/button'
 import { Badge } from '@/components/ui/display/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -9,74 +10,55 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/forms/input'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { formatDate, formatPrice } from '@/lib/format'
-
-type CreditStatus = 'Activo' | 'Pendiente' | 'Pagado' | 'Vencido'
-
-type CreditItem = {
-  id: string
-  customer: string
-  seller: string
-  amount: number
-  paid: number
-  dueDate: string
-  status: CreditStatus
-  notes: string
-  createdAt: string
-}
-
-const customerSuggestions = ['Valeria Mora', 'Luis Chacon', 'Carlos Araya', 'Andrea Coto', 'Hotel Esmeralda']
-
-const initialCredits: CreditItem[] = [
-  {
-    id: 'CR-001',
-    customer: 'Carlos Araya',
-    seller: 'Daniela Vargas',
-    amount: 185000,
-    paid: 100000,
-    dueDate: '2026-05-31',
-    status: 'Activo',
-    notes: 'Credito aprobado para proyecto de pecera 120x50x60.',
-    createdAt: '2026-05-18',
-  },
-  {
-    id: 'CR-002',
-    customer: 'Andrea Coto',
-    seller: 'Luis Chacon',
-    amount: 62500,
-    paid: 0,
-    dueDate: '2026-05-27',
-    status: 'Pendiente',
-    notes: 'Separacion de equipo con pago total en una cuota.',
-    createdAt: '2026-05-20',
-  },
-  {
-    id: 'CR-003',
-    customer: 'Hotel Esmeralda',
-    seller: 'Daniela Vargas',
-    amount: 350000,
-    paid: 350000,
-    dueDate: '2026-05-15',
-    status: 'Pagado',
-    notes: 'Credito liquidado y listo para facturacion final.',
-    createdAt: '2026-05-02',
-  },
-]
+import { deleteCredit, getCreditManagementData, saveCredit } from '@/lib/credits/actions'
+import type { CreditCustomerOption, CreditItem } from '@/lib/credits/types'
 
 const initialFormState = {
-  customer: customerSuggestions[0],
-  seller: 'Daniela Vargas',
+  customerId: '',
   amount: '0',
   paid: '0',
-  dueDate: '2026-05-30',
-  status: 'Pendiente' as CreditStatus,
+  dueDate: '',
   notes: '',
 }
 
 export function CreditManagement() {
-  const [credits, setCredits] = useState(initialCredits)
+  const [credits, setCredits] = useState<CreditItem[]>([])
+  const [customers, setCustomers] = useState<CreditCustomerOption[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [creditSearch, setCreditSearch] = useState('')
   const [editingCreditId, setEditingCreditId] = useState<string | null>(null)
   const [creditForm, setCreditForm] = useState(initialFormState)
+  const [isSaving, startSaving] = useTransition()
+  const [isDeleting, startDeleting] = useTransition()
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCredits() {
+      try {
+        const data = await getCreditManagementData()
+        if (cancelled) return
+        setCredits(data.credits)
+        setCustomers(data.customers)
+        setCreditForm((current) => ({
+          ...current,
+          customerId: current.customerId || data.customers[0]?.id || '',
+        }))
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los créditos.')
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    loadCredits()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filteredCredits = useMemo(() => {
     const term = creditSearch.toLowerCase()
@@ -94,7 +76,7 @@ export function CreditManagement() {
       (acc, credit) => {
         acc.total += credit.amount
         acc.pending += Math.max(credit.amount - credit.paid, 0)
-        if (credit.status === 'Activo' || credit.status === 'Pendiente') {
+        if (credit.status === 'Activo') {
           acc.open += 1
         }
         if (credit.status === 'Vencido') {
@@ -107,21 +89,14 @@ export function CreditManagement() {
     )
   }, [credits])
 
-  const highRiskCredits = useMemo(
-    () =>
-      credits.filter(
-        (credit) =>
-          credit.status === 'Vencido' ||
-          credit.amount - credit.paid >= credit.amount * 0.5,
-      ),
-    [credits],
-  )
-
   const riskRatio = creditMetrics.total > 0 ? Math.round((creditMetrics.overdueBalance / creditMetrics.total) * 100) : 0
 
   function resetCreditForm() {
     setEditingCreditId(null)
-    setCreditForm(initialFormState)
+    setCreditForm({
+      ...initialFormState,
+      customerId: customers[0]?.id ?? '',
+    })
   }
 
   function handleCreditFieldChange(field: keyof typeof creditForm, value: string) {
@@ -132,51 +107,58 @@ export function CreditManagement() {
     const amount = Number(creditForm.amount) || 0
     const paid = Number(creditForm.paid) || 0
 
-    if (!creditForm.customer.trim() || !creditForm.seller.trim() || amount <= 0) {
+    if (!creditForm.customerId || amount <= 0) {
+      toast.error('Seleccioná un cliente y digitá un monto válido.')
       return
     }
 
-    const payload: CreditItem = {
-      id: editingCreditId ?? `CR-${String(credits.length + 1).padStart(3, '0')}`,
-      customer: creditForm.customer.trim(),
-      seller: creditForm.seller.trim(),
-      amount,
-      paid: Math.max(0, Math.min(paid, amount)),
-      dueDate: creditForm.dueDate,
-      status: creditForm.status,
-      notes: creditForm.notes.trim(),
-      createdAt:
-        credits.find((credit) => credit.id === editingCreditId)?.createdAt ?? new Date().toISOString().slice(0, 10),
-    }
+    startSaving(async () => {
+      const result = await saveCredit({
+        id: editingCreditId,
+        customerId: creditForm.customerId,
+        amount,
+        paid,
+        dueDate: creditForm.dueDate || null,
+        notes: creditForm.notes,
+      })
 
-    setCredits((current) => {
-      if (editingCreditId) {
-        return current.map((credit) => (credit.id === editingCreditId ? payload : credit))
+      if (!result.ok) {
+        toast.error(result.message)
+        return
       }
-      return [payload, ...current]
-    })
 
-    resetCreditForm()
+      const data = await getCreditManagementData()
+      setCredits(data.credits)
+      setCustomers(data.customers)
+      toast.success(editingCreditId ? 'Crédito actualizado correctamente.' : 'Crédito registrado correctamente.')
+      resetCreditForm()
+    })
   }
 
   function editCredit(credit: CreditItem) {
     setEditingCreditId(credit.id)
     setCreditForm({
-      customer: credit.customer,
-      seller: credit.seller,
+      customerId: credit.customerId,
       amount: String(credit.amount),
       paid: String(credit.paid),
       dueDate: credit.dueDate,
-      status: credit.status,
       notes: credit.notes,
     })
   }
 
-  function deleteCredit(id: string) {
-    setCredits((current) => current.filter((credit) => credit.id !== id))
-    if (editingCreditId === id) {
-      resetCreditForm()
-    }
+  function handleDeleteCredit(id: string) {
+    startDeleting(async () => {
+      const result = await deleteCredit(id)
+
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+
+      setCredits((current) => current.filter((credit) => credit.id !== id))
+      if (editingCreditId === id) resetCreditForm()
+      toast.success('Crédito eliminado correctamente.')
+    })
   }
 
   return (
@@ -226,25 +208,20 @@ export function CreditManagement() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-foreground">Cliente</label>
-                <Input
-                  value={creditForm.customer}
-                  onChange={(event) => handleCreditFieldChange('customer', event.target.value)}
-                  placeholder="Nombre del cliente"
-                  list="credit-customers"
-                />
-                <datalist id="credit-customers">
-                  {customerSuggestions.map((customer) => (
-                    <option key={customer} value={customer} />
+                <select
+                  value={creditForm.customerId}
+                  onChange={(event) => handleCreditFieldChange('customerId', event.target.value)}
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  disabled={customers.length === 0}
+                >
+                  <option value="">Seleccionar cliente</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.label}
+                      {customer.email ? ` · ${customer.email}` : ''}
+                    </option>
                   ))}
-                </datalist>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-foreground">Vendedor</label>
-                <Input
-                  value={creditForm.seller}
-                  onChange={(event) => handleCreditFieldChange('seller', event.target.value)}
-                  placeholder="Responsable del credito"
-                />
+                </select>
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-foreground">Monto del credito</label>
@@ -276,21 +253,6 @@ export function CreditManagement() {
                   onChange={(event) => handleCreditFieldChange('dueDate', event.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-foreground">Estado</label>
-                <Input
-                  value={creditForm.status}
-                  onChange={(event) => handleCreditFieldChange('status', event.target.value as CreditStatus)}
-                  placeholder="Pendiente"
-                  list="credit-statuses"
-                />
-                <datalist id="credit-statuses">
-                  <option value="Pendiente" />
-                  <option value="Activo" />
-                  <option value="Pagado" />
-                  <option value="Vencido" />
-                </datalist>
-              </div>
             </div>
 
             <div className="grid gap-2">
@@ -303,13 +265,18 @@ export function CreditManagement() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleCreditSubmit}>
-                {editingCreditId ? 'Guardar cambios' : 'Registrar credito'}
+              <Button onClick={handleCreditSubmit} disabled={isSaving || customers.length === 0}>
+                {isSaving ? 'Guardando...' : editingCreditId ? 'Guardar cambios' : 'Registrar credito'}
               </Button>
-              <Button variant="outline" onClick={resetCreditForm}>
+              <Button variant="outline" onClick={resetCreditForm} disabled={isSaving}>
                 Limpiar formulario
               </Button>
             </div>
+            {customers.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No hay perfiles de cliente disponibles. Registrá un cliente con correo para poder asignarle crédito.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -346,14 +313,30 @@ export function CreditManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCredits.map((credit) => {
-                  const balance = Math.max(credit.amount - credit.paid, 0)
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      Cargando créditos...
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {!isLoading && filteredCredits.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      No hay créditos registrados.
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {!isLoading && filteredCredits.map((credit) => {
+                  const balance = credit.balance
                   const riskScore = credit.status === 'Vencido' ? 'Alto' : balance >= credit.amount * 0.5 ? 'Medio' : 'Bajo'
 
                   return (
                     <TableRow key={credit.id}>
                       <TableCell>
-                        <div className="font-medium">{credit.id}</div>
+                        <div className="font-medium">CR-{credit.id.slice(0, 8).toUpperCase()}</div>
                         <div className="text-xs text-muted-foreground">{credit.seller}</div>
                       </TableCell>
                       <TableCell>
@@ -374,7 +357,7 @@ export function CreditManagement() {
                         </Badge>
                       </TableCell>
                       <TableCell>{formatPrice(balance)}</TableCell>
-                      <TableCell>{formatDate(credit.dueDate)}</TableCell>
+                      <TableCell>{credit.dueDate ? formatDate(credit.dueDate) : 'Sin fecha'}</TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -393,7 +376,7 @@ export function CreditManagement() {
                           <Button size="icon-sm" variant="outline" onClick={() => editCredit(credit)}>
                             <FilePenLine className="h-4 w-4" />
                           </Button>
-                          <Button size="icon-sm" variant="destructive" onClick={() => deleteCredit(credit.id)}>
+                          <Button size="icon-sm" variant="destructive" onClick={() => handleDeleteCredit(credit.id)} disabled={isDeleting}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
