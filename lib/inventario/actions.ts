@@ -249,6 +249,13 @@ function slugify(name: string) {
     .replace(/(^-|-$)/g, '')
 }
 
+function productImagePathFromUrl(url: string) {
+  const marker = `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`
+  const markerIndex = url.indexOf(marker)
+  if (markerIndex === -1) return null
+  return decodeURIComponent(url.slice(markerIndex + marker.length))
+}
+
 export async function crearProducto(
   input: ProductoValues,
   images: File[],
@@ -383,6 +390,7 @@ export async function crearProducto(
 export async function actualizarProducto(
   productId: string,
   input: EditarProductoValues,
+  keptImages: string[],
   newImages: File[],
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -399,9 +407,22 @@ export async function actualizarProducto(
       return { success: false, error: 'No se encontró el inventario del producto.' }
     }
 
-    // 2. Validar imágenes nuevas (mismas reglas que crearProducto)
-    if (newImages.length > MAX_PRODUCT_IMAGES) {
-      return { success: false, error: `Puede cargar un máximo de ${MAX_PRODUCT_IMAGES} imágenes.` }
+    // 2. Imágenes actuales, leídas frescas de la base (no se confía en lo que
+    //    mandó el cliente para saber qué había antes) — se usan más abajo para
+    //    calcular por diff qué archivos del bucket quedaron huérfanos.
+    const { data: productoActual, error: errorProductoActual } = await supabase
+      .from('products')
+      .select('images')
+      .eq('id', productId)
+      .single()
+
+    if (errorProductoActual) {
+      return { success: false, error: 'No se encontró el producto.' }
+    }
+
+    // 3. Validar imágenes nuevas y el total combinado (mismas reglas que crearProducto)
+    if (keptImages.length + newImages.length > MAX_PRODUCT_IMAGES) {
+      return { success: false, error: `Puede tener un máximo de ${MAX_PRODUCT_IMAGES} imágenes.` }
     }
     for (const image of newImages) {
       if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(image.type)) {
@@ -415,13 +436,10 @@ export async function actualizarProducto(
       }
     }
 
-    // 3. Si hay imágenes nuevas, subirlas y reemplazar el array completo
-    //    (mismo comportamiento que modificar-lote/[id] para animales — el
-    //    manejo granular de agregar/quitar individualmente queda para otra
-    //    sesión). Si no se seleccionó ninguna, las imágenes actuales quedan
-    //    intactas (no se tocan en el UPDATE).
-    let imageUrls: string[] | undefined
+    // 4. Subir imágenes nuevas (si hay). Las existentes que se conservan
+    //    (keptImages) no se tocan — se agregan tal cual al array final.
     const uploadedPaths: string[] = []
+    const newUrls: string[] = []
 
     if (newImages.length) {
       const slug = slugify(`producto-${productId}`)
@@ -447,7 +465,6 @@ export async function actualizarProducto(
         }
       }
 
-      imageUrls = []
       for (const [index, image] of newImages.entries()) {
         const path = `${slug}/${crypto.randomUUID()}-${index}.${productImageExtension(image)}`
         const { error: uploadError } = await supabase.storage
@@ -463,11 +480,13 @@ export async function actualizarProducto(
 
         uploadedPaths.push(path)
         const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path)
-        imageUrls.push(data.publicUrl)
+        newUrls.push(data.publicUrl)
       }
     }
 
-    // 4. Actualizar products (sin slug/sku/quantity)
+    const finalImages = [...keptImages, ...newUrls]
+
+    // 5. Actualizar products (sin slug/sku/quantity)
     const { error: errorProducto } = await supabase
       .from('products')
       .update({
@@ -478,7 +497,7 @@ export async function actualizarProducto(
         price: input.price,
         cost: input.cost,
         is_featured: input.is_featured,
-        ...(imageUrls ? { images: imageUrls } : {}),
+        images: finalImages.length ? finalImages : null,
       })
       .eq('id', productId)
 
@@ -489,7 +508,7 @@ export async function actualizarProducto(
       return { success: false, error: `Error al actualizar el producto: ${errorProducto.message}` }
     }
 
-    // 5. Actualizar inventory — solo location y low_stock_threshold, NUNCA quantity
+    // 6. Actualizar inventory — solo location y low_stock_threshold, NUNCA quantity
     const { error: errorInventarioUpdate } = await supabase
       .from('inventory')
       .update({
@@ -500,6 +519,22 @@ export async function actualizarProducto(
 
     if (errorInventarioUpdate) {
       return { success: false, error: `Error al actualizar el inventario: ${errorInventarioUpdate.message}` }
+    }
+
+    // 7. El UPDATE ya se confirmó — recién ahora borrar del bucket lo que
+    //    estaba en el producto antes y ya no está en el array final (diff en
+    //    servidor, no se confía en que el cliente haya reportado bien qué
+    //    eliminó). Best-effort: si el borrado falla, no se revierte el guardado
+    //    (ya está guardado correctamente), solo queda un archivo huérfano.
+    const origImages = (productoActual.images as string[] | null) ?? []
+    const finalSet = new Set(finalImages)
+    const orphanPaths = origImages
+      .filter((url) => !finalSet.has(url))
+      .map(productImagePathFromUrl)
+      .filter((path): path is string => Boolean(path))
+
+    if (orphanPaths.length) {
+      await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(orphanPaths)
     }
 
     return { success: true }

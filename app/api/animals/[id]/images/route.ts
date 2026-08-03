@@ -37,9 +37,23 @@ export async function POST(
     .getAll("imagenes")
     .filter((value): value is File => value instanceof File && value.size > 0)
 
-  if (!images.length || images.length > MAX_IMAGES) {
+  // keepImages: URLs existentes que el admin no eliminó (JSON, mandado por
+  // modificar-lote/[id]/page.tsx). Ya no se exige al menos 1 archivo nuevo —
+  // este endpoint también se llama cuando solo se eliminó una imagen.
+  let keepImages: string[] = []
+  const keepImagesRaw = formData.get("keepImages")
+  if (typeof keepImagesRaw === "string") {
+    try {
+      const parsed = JSON.parse(keepImagesRaw)
+      if (Array.isArray(parsed)) keepImages = parsed.filter((v): v is string => typeof v === "string")
+    } catch {
+      return NextResponse.json({ error: "keepImages inválido." }, { status: 400 })
+    }
+  }
+
+  if (keepImages.length + images.length > MAX_IMAGES) {
     return NextResponse.json(
-      { error: `Seleccione entre 1 y ${MAX_IMAGES} imágenes.` },
+      { error: `Puede tener un máximo de ${MAX_IMAGES} imágenes.` },
       { status: 400 },
     )
   }
@@ -71,7 +85,7 @@ export async function POST(
   }
 
   const uploadedPaths: string[] = []
-  const imageUrls: string[] = []
+  const newUrls: string[] = []
 
   for (const [index, image] of images.entries()) {
     const path = `${animalId}/${crypto.randomUUID()}-${index}.${extensionFor(image)}`
@@ -94,29 +108,38 @@ export async function POST(
 
     uploadedPaths.push(path)
     const { data } = admin.storage.from(BUCKET).getPublicUrl(path)
-    imageUrls.push(data.publicUrl)
+    newUrls.push(data.publicUrl)
   }
+
+  const finalImages = [...keepImages, ...newUrls]
 
   const { error: updateError } = await supabaseUser
     .from("animals")
-    .update({ images: imageUrls })
+    .update({ images: finalImages.length ? finalImages : null })
     .eq("id", animalId)
 
   if (updateError) {
-    await admin.storage.from(BUCKET).remove(uploadedPaths)
+    if (uploadedPaths.length) {
+      await admin.storage.from(BUCKET).remove(uploadedPaths)
+    }
     return NextResponse.json(
       { error: `No se pudieron guardar las imágenes: ${updateError.message}` },
       { status: 500 },
     )
   }
 
-  const oldPaths = ((currentAnimal.images as string[] | null) ?? [])
+  // El UPDATE ya se confirmó — recién ahora borrar del bucket lo que estaba
+  // antes y ya no está en el array final (diff en servidor, best-effort: si
+  // falla el borrado no se revierte el guardado, solo queda un huérfano).
+  const finalSet = new Set(finalImages)
+  const orphanPaths = ((currentAnimal.images as string[] | null) ?? [])
+    .filter((url) => !finalSet.has(url))
     .map(storagePathFromUrl)
     .filter((path): path is string => Boolean(path))
 
-  if (oldPaths.length) {
-    await admin.storage.from(BUCKET).remove(oldPaths)
+  if (orphanPaths.length) {
+    await admin.storage.from(BUCKET).remove(orphanPaths)
   }
 
-  return NextResponse.json({ images: imageUrls })
+  return NextResponse.json({ images: finalImages })
 }

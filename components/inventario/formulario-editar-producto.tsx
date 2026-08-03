@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, X } from 'lucide-react'
 
 import {
   editarProductoSchema,
@@ -14,13 +13,14 @@ import {
   UBICACION_LABELS,
 } from '@/lib/inventario/schemas'
 import { actualizarProducto } from '@/lib/inventario/actions'
+import { useGestionImagenes } from '@/hooks/use-gestion-imagenes'
 
 import { Button } from '@/components/ui/actions/button'
 import { Input } from '@/components/ui/forms/input'
 import { Label } from '@/components/ui/forms/label'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { Checkbox } from '@/components/ui/forms/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/display/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/display/card'
 import {
   Select,
   SelectContent,
@@ -60,15 +60,21 @@ interface FormularioEditarProductoProps {
   categorias: CategoriaProducto[]
 }
 
-const MAX_IMAGENES = 5
-
 export function FormularioEditarProducto({
   producto,
   inventario,
   categorias,
 }: FormularioEditarProductoProps) {
   const router = useRouter()
-  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const {
+    keptImages,
+    newFiles,
+    totalCount,
+    maxImages,
+    addFiles,
+    removeExisting,
+    removeNewFile,
+  } = useGestionImagenes({ initialImages: producto.images ?? [] })
 
   const {
     register,
@@ -91,19 +97,15 @@ export function FormularioEditarProducto({
     },
   })
 
-  function handleImagesChange(event: React.ChangeEvent<HTMLInputElement>) {
+function handleImagesChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
-    if (files.length > MAX_IMAGENES) {
-      toast.error(`Puede seleccionar un máximo de ${MAX_IMAGENES} imágenes.`)
-      event.target.value = ''
-      setSelectedImages([])
-      return
-    }
-    setSelectedImages(files)
+    const errorMsg = addFiles(files)
+    if (errorMsg) toast.error(errorMsg)
+    event.target.value = ''
   }
 
   async function onSubmit(values: EditarProductoValues) {
-    const result = await actualizarProducto(producto.id, values, selectedImages)
+    const result = await actualizarProducto(producto.id, values, keptImages, newFiles)
 
     if (!result.success) {
       toast.error(result.error ?? 'No se pudo actualizar el producto')
@@ -273,8 +275,7 @@ export function FormularioEditarProducto({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                La cantidad solo se modifica desde "Ajustar stock", para mantener el historial
-                de movimientos.
+                La cantidad solo se modifica desde "Ajustar stock"
               </p>
             </div>
 
@@ -330,15 +331,41 @@ export function FormularioEditarProducto({
 
           <div className="space-y-1.5">
             <Label htmlFor="images">Imágenes del producto</Label>
-            {producto.images && producto.images.length > 0 && (
-              <div className="mb-1 flex flex-wrap gap-3">
-                {producto.images.map((image, index) => (
-                  <img
-                    key={image}
-                    src={image}
-                    alt={`Imagen actual ${index + 1} de ${producto.name}`}
-                    className="h-20 w-20 rounded-md border object-cover"
-                  />
+            {(keptImages.length > 0 || newFiles.length > 0) && (
+              <div className="mt-3 mb-1 flex flex-wrap gap-3">
+                {keptImages.map((image, index) => (
+                  <div key={image} className="relative h-20 w-20">
+                    <img
+                      src={image}
+                      alt={`Imagen ${index + 1} de ${producto.name}`}
+                      className="h-20 w-20 rounded-md border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeExisting(image)}
+                      aria-label="Eliminar imagen"
+                      className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {newFiles.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="relative h-20 w-20">
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border border-dashed bg-muted/40 p-1 text-center">
+                      <span className="line-clamp-2 text-[10px] text-muted-foreground">
+                        {file.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeNewFile(index)}
+                      aria-label="Quitar imagen"
+                      className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -348,35 +375,29 @@ export function FormularioEditarProducto({
               accept="image/jpeg,image/png,image/webp"
               multiple
               onChange={handleImagesChange}
-              className="file:mr-4 file:rounded-md file:bg-primary file:px-4 file:text-primary-foreground hover:file:bg-primary/90"
+              disabled={totalCount >= maxImages}
+              className="h-auto py-2 file:mr-4 file:h-auto file:rounded-md file:bg-primary file:px-4 file:py-2 file:text-primary-foreground hover:file:bg-primary/90"
             />
             <p className="text-xs text-muted-foreground">
-              Si selecciona archivos, reemplazarán las imágenes actuales. Máximo{' '}
-              {MAX_IMAGENES} imágenes JPG, PNG o WEBP (5 MB cada una).
+              {totalCount}/{maxImages} imágenes. JPG, PNG o WEBP, máximo 5 MB cada una.
             </p>
-            {selectedImages.length > 0 && (
-              <p className="text-sm font-medium text-primary">
-                {selectedImages.length} imagen{selectedImages.length === 1 ? '' : 'es'} seleccionada
-                {selectedImages.length === 1 ? '' : 's'}.
-              </p>
-            )}
           </div>
         </CardContent>
-      </Card>
 
-      {/* Botones de acción */}
-      <div className="flex items-center justify-end gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push('/dashboard?modulo=inventory')}
-        >
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Guardando…' : 'Guardar cambios'}
-        </Button>
-      </div>
+        {/* Botones de acción */}
+        <CardFooter className="justify-end gap-3 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/dashboard?modulo=inventory')}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   )
 }
