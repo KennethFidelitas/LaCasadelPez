@@ -1,35 +1,12 @@
-export type Categoria =
-  | 'pez-dulce'
-  | 'pez-salado'
-  | 'coral'
-  | 'invertebrado'
-  | 'planta-acuatica'
+import type { Animal } from '@/lib/types'
 
-export type TipoAgua = 'dulce' | 'salada'
-export type Temperamento = 'pacifico' | 'agresivo' | 'solitario'
-export type NivelCuidado = 'facil' | 'intermedio' | 'avanzado'
 export type Ordenamiento = 'relevancia' | 'precio-asc' | 'precio-desc' | 'nombre-az'
 
-export interface Producto {
-  id: string
-  nombre: string
-  categoria: Categoria
-  tipoAgua: TipoAgua
-  precio: number
-  imagen: string
-  marca: string
-  descripcion: string
-  disponible: boolean
-  temperamento: Temperamento
-  nivelCuidado: NivelCuidado
-  destacado: boolean
-}
-
 export interface FiltrosState {
-  tipoAgua: 'todos' | TipoAgua
+  /** ids de categories (type='animal') */
   categorias: string[]
-  nivelCuidado: string[]
-  temperamento: string[]
+  nivelCuidado: Array<NonNullable<Animal['care_level']>>
+  temperamento: Array<NonNullable<Animal['temperament']>>
   precioMin: number
   precioMax: number
   soloDisponibles: boolean

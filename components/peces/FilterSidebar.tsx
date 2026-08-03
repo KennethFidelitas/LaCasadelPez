@@ -1,8 +1,13 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { PRECIO_MIN, PRECIO_MAX, formatColones } from './data'
+import { formatColones } from './data'
 import type { FiltrosState } from './types'
+
+interface CategoriaOption {
+  id: string
+  name: string
+}
 
 interface FilterSidebarProps {
   filtros: FiltrosState
@@ -10,42 +15,25 @@ interface FilterSidebarProps {
   onLimpiar: () => void
   isOpen: boolean
   onClose: () => void
+  categorias: CategoriaOption[]
+  precioMin: number
+  precioMax: number
 }
-
-const CATEGORIAS = [
-  { value: 'pez-dulce', label: 'Peces Agua Dulce' },
-  { value: 'pez-salado', label: 'Peces Agua Salada' },
-  { value: 'coral', label: 'Corales' },
-  { value: 'invertebrado', label: 'Invertebrados' },
-  { value: 'planta-acuatica', label: 'Plantas Acuáticas' },
-]
 
 const NIVELES = [
   { value: 'facil', label: 'Fácil' },
-  { value: 'intermedio', label: 'Intermedio' },
+  { value: 'moderado', label: 'Moderado' },
   { value: 'avanzado', label: 'Avanzado' },
-]
+] as const
 
 const TEMPERAMENTOS = [
   { value: 'pacifico', label: 'Pacífico' },
+  { value: 'semi-agresivo', label: 'Semi-agresivo' },
   { value: 'agresivo', label: 'Agresivo' },
-  { value: 'solitario', label: 'Solitario' },
-]
+] as const
 
-function toggleArr(arr: string[], value: string): string[] {
-  return arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]
-}
-
-function hayFiltrosActivos(f: FiltrosState): boolean {
-  return (
-    f.tipoAgua !== 'todos' ||
-    f.categorias.length > 0 ||
-    f.nivelCuidado.length > 0 ||
-    f.temperamento.length > 0 ||
-    f.precioMin > PRECIO_MIN ||
-    f.precioMax < PRECIO_MAX ||
-    f.soloDisponibles
-  )
+function toggleArr<T>(arr: T[], value: T): T[] {
+  return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]
 }
 
 export function FilterSidebar({
@@ -54,8 +42,17 @@ export function FilterSidebar({
   onLimpiar,
   isOpen,
   onClose,
+  categorias,
+  precioMin,
+  precioMax,
 }: FilterSidebarProps) {
-  const activo = hayFiltrosActivos(filtros)
+  const activo =
+    filtros.categorias.length > 0 ||
+    filtros.nivelCuidado.length > 0 ||
+    filtros.temperamento.length > 0 ||
+    filtros.precioMin > precioMin ||
+    filtros.precioMax < precioMax ||
+    filtros.soloDisponibles
 
   const panel = (
     <div className="rounded-xl border border-border bg-background p-4">
@@ -81,56 +78,36 @@ export function FilterSidebar({
         </div>
       </div>
 
-      {/* Tipo de agua */}
-      <div className="mt-4 border-t border-border pt-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Tipo de agua</p>
-        <div className="flex flex-col gap-1.5">
-          {(['todos', 'dulce', 'salada'] as const).map(tipo => (
-            <label key={tipo} className="flex cursor-pointer items-center gap-2">
-              <input
-                type="radio"
-                name="tipoAgua"
-                value={tipo}
-                checked={filtros.tipoAgua === tipo}
-                onChange={() => onFiltrosChange({ ...filtros, tipoAgua: tipo })}
-                className="accent-primary"
-              />
-              <span className="text-sm text-foreground">
-                {tipo === 'todos' ? 'Todos' : tipo === 'dulce' ? 'Agua Dulce' : 'Agua Salada'}
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
-
       {/* Categoría */}
-      <div className="mt-4 border-t border-border pt-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Categoría</p>
-        <div className="flex flex-col gap-1.5">
-          {CATEGORIAS.map(cat => (
-            <label key={cat.value} className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={filtros.categorias.includes(cat.value)}
-                onChange={() =>
-                  onFiltrosChange({
-                    ...filtros,
-                    categorias: toggleArr(filtros.categorias, cat.value),
-                  })
-                }
-                className="accent-primary"
-              />
-              <span className="text-sm text-foreground">{cat.label}</span>
-            </label>
-          ))}
+      {categorias.length > 0 && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="mb-2 text-sm font-medium text-foreground">Categoría</p>
+          <div className="flex flex-col gap-1.5">
+            {categorias.map((cat) => (
+              <label key={cat.id} className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={filtros.categorias.includes(cat.id)}
+                  onChange={() =>
+                    onFiltrosChange({
+                      ...filtros,
+                      categorias: toggleArr(filtros.categorias, cat.id),
+                    })
+                  }
+                  className="accent-primary"
+                />
+                <span className="text-sm text-foreground">{cat.name}</span>
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Nivel de cuidado */}
       <div className="mt-4 border-t border-border pt-4">
         <p className="mb-2 text-sm font-medium text-foreground">Nivel de cuidado</p>
         <div className="flex flex-col gap-1.5">
-          {NIVELES.map(n => (
+          {NIVELES.map((n) => (
             <label key={n.value} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -153,7 +130,7 @@ export function FilterSidebar({
       <div className="mt-4 border-t border-border pt-4">
         <p className="mb-2 text-sm font-medium text-foreground">Temperamento</p>
         <div className="flex flex-col gap-1.5">
-          {TEMPERAMENTOS.map(t => (
+          {TEMPERAMENTOS.map((t) => (
             <label key={t.value} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -184,14 +161,13 @@ export function FilterSidebar({
             <label className="mb-1 block text-xs text-foreground/50">Mínimo</label>
             <input
               type="range"
-              min={PRECIO_MIN}
-              max={PRECIO_MAX}
+              min={precioMin}
+              max={precioMax}
               step={500}
               value={filtros.precioMin}
-              onChange={e => {
+              onChange={(e) => {
                 const val = Number(e.target.value)
-                if (val <= filtros.precioMax)
-                  onFiltrosChange({ ...filtros, precioMin: val })
+                if (val <= filtros.precioMax) onFiltrosChange({ ...filtros, precioMin: val })
               }}
               className="w-full accent-primary"
             />
@@ -200,14 +176,13 @@ export function FilterSidebar({
             <label className="mb-1 block text-xs text-foreground/50">Máximo</label>
             <input
               type="range"
-              min={PRECIO_MIN}
-              max={PRECIO_MAX}
+              min={precioMin}
+              max={precioMax}
               step={500}
               value={filtros.precioMax}
-              onChange={e => {
+              onChange={(e) => {
                 const val = Number(e.target.value)
-                if (val >= filtros.precioMin)
-                  onFiltrosChange({ ...filtros, precioMax: val })
+                if (val >= filtros.precioMin) onFiltrosChange({ ...filtros, precioMax: val })
               }}
               className="w-full accent-primary"
             />

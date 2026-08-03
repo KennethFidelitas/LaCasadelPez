@@ -1,45 +1,50 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Heart, ShoppingCart } from 'lucide-react'
+import Image from 'next/image'
+import { Search, Heart, ShoppingCart, Fish } from 'lucide-react'
 import { formatColones } from './data'
-import type { Producto } from './types'
+import { useCart } from '@/lib/cart-context'
+import type { Animal } from '@/lib/types'
 
-const CATEGORIA_LABELS: Record<Producto['categoria'], string> = {
-  'pez-dulce': 'Agua Dulce',
-  'pez-salado': 'Agua Salada',
-  coral: 'Coral',
-  invertebrado: 'Invertebrado',
-  'planta-acuatica': 'Planta',
-}
-
-const NIVEL_CONFIG: Record<
-  Producto['nivelCuidado'],
-  { label: string; className: string }
-> = {
+const NIVEL_CONFIG: Record<NonNullable<Animal['care_level']>, { label: string; className: string }> = {
   facil: { label: 'Fácil', className: 'bg-accent/20 text-teal' },
-  intermedio: { label: 'Intermedio', className: 'bg-sand/30 text-sand' },
+  moderado: { label: 'Moderado', className: 'bg-sand/30 text-sand' },
   avanzado: { label: 'Avanzado', className: 'bg-destructive/20 text-destructive' },
 }
 
-const TEMPERAMENTO_CONFIG: Record<
-  Producto['temperamento'],
-  { label: string; className: string }
-> = {
+const TEMPERAMENTO_CONFIG: Record<NonNullable<Animal['temperament']>, { label: string; className: string }> = {
   pacifico: { label: 'Pacífico', className: 'bg-accent/20 text-teal' },
+  'semi-agresivo': { label: 'Semi-agresivo', className: 'bg-sand/30 text-sand' },
   agresivo: { label: 'Agresivo', className: 'bg-destructive/20 text-destructive' },
-  solitario: { label: 'Solitario', className: 'bg-ocean-light/30 text-ocean' },
 }
 
 interface ProductCardProps {
-  producto: Producto
+  animal: Animal
 }
 
-export function ProductCard({ producto }: ProductCardProps) {
+export function ProductCard({ animal }: ProductCardProps) {
   const [hovered, setHovered] = useState(false)
+  const { addItem, openCart } = useCart()
 
-  const nivel = NIVEL_CONFIG[producto.nivelCuidado]
-  const temperamento = TEMPERAMENTO_CONFIG[producto.temperamento]
+  const nivel = animal.care_level ? NIVEL_CONFIG[animal.care_level] : null
+  const temperamento = animal.temperament ? TEMPERAMENTO_CONFIG[animal.temperament] : null
+  const disponible = animal.stock_quantity > 0
+  const pocasUnidades = disponible && animal.stock_quantity <= animal.low_stock_threshold
+  const imagen = animal.images?.[0]
+
+  function handleAddToCart() {
+    addItem({
+      id: animal.id,
+      type: 'animal',
+      name: animal.name,
+      price: animal.price,
+      image: imagen,
+      stock: animal.stock_quantity,
+      sku: animal.sku,
+    })
+    openCart()
+  }
 
   return (
     <div
@@ -49,11 +54,18 @@ export function ProductCard({ producto }: ProductCardProps) {
     >
       {/* ── Imagen ─────────────────────────────────────────────────────── */}
       <div className="relative aspect-square overflow-hidden bg-secondary rounded-lg">
-        <img
-          src={producto.imagen}
-          alt={producto.nombre}
-          className="h-full w-full object-contain"
-        />
+        {imagen ? (
+          <Image
+            src={imagen}
+            alt={animal.name}
+            fill
+            className="object-cover transition-transform group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Fish className="h-12 w-12 text-foreground/20" />
+          </div>
+        )}
 
         {/* Íconos de hover */}
         <div
@@ -75,14 +87,18 @@ export function ProductCard({ producto }: ProductCardProps) {
           </button>
         </div>
 
-
         {/* Badge: estado (esquina superior derecha) */}
-        {!producto.disponible && (
+        {!disponible && (
           <span className="absolute right-2 top-2 rounded-sm bg-destructive/20 px-1.5 py-0.5 text-xs text-destructive">
             Agotado
           </span>
         )}
-        {producto.disponible && producto.destacado && (
+        {disponible && pocasUnidades && (
+          <span className="absolute right-2 top-2 rounded-sm bg-yellow-500/20 px-1.5 py-0.5 text-xs text-yellow-700">
+            Pocas unidades
+          </span>
+        )}
+        {disponible && !pocasUnidades && animal.is_featured && (
           <span className="absolute right-2 top-2 rounded-sm bg-sand/30 px-1.5 py-0.5 text-xs text-sand">
             Destacado
           </span>
@@ -91,42 +107,42 @@ export function ProductCard({ producto }: ProductCardProps) {
 
       {/* ── Contenido ──────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col p-3">
-        <p className="text-xs uppercase tracking-wide text-foreground/50">
-          {producto.marca}
-        </p>
-
-        <h3 className="mt-0.5 line-clamp-2 text-sm font-medium text-foreground leading-snug">
-          {producto.nombre}
+        <h3 className="line-clamp-2 text-sm font-medium text-foreground leading-snug">
+          {animal.name}
         </h3>
+        {animal.scientific_name && (
+          <p className="text-xs italic text-foreground/50 line-clamp-1">
+            {animal.scientific_name}
+          </p>
+        )}
 
-        <p className="mt-1 line-clamp-2 text-xs text-foreground/60">
-          {producto.descripcion}
-        </p>
+        {animal.description && (
+          <p className="mt-1 line-clamp-2 text-xs text-foreground/60">{animal.description}</p>
+        )}
 
-        {/* Badges: categoría (no-peces), tipo de agua, temperamento, nivel de cuidado */}
+        {/* Badges: categoría, temperamento, nivel de cuidado */}
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          {(producto.categoria === 'invertebrado' ||
-            producto.categoria === 'coral' ||
-            producto.categoria === 'planta-acuatica') && (
+          {animal.category?.name && (
             <span className="rounded-sm bg-ocean-light/20 px-1.5 py-0.5 text-xs text-ocean">
-              {CATEGORIA_LABELS[producto.categoria]}
+              {animal.category.name}
             </span>
           )}
-          <span className="rounded-sm bg-accent/20 px-1.5 py-0.5 text-xs text-teal">
-            {producto.tipoAgua === 'dulce' ? 'Agua Dulce' : 'Agua Salada'}
-          </span>
-          <span className={`rounded-sm px-1.5 py-0.5 text-xs ${temperamento.className}`}>
-            {temperamento.label}
-          </span>
-          <span className={`rounded-sm px-1.5 py-0.5 text-xs ${nivel.className}`}>
-            {nivel.label}
-          </span>
+          {temperamento && (
+            <span className={`rounded-sm px-1.5 py-0.5 text-xs ${temperamento.className}`}>
+              {temperamento.label}
+            </span>
+          )}
+          {nivel && (
+            <span className={`rounded-sm px-1.5 py-0.5 text-xs ${nivel.className}`}>
+              {nivel.label}
+            </span>
+          )}
         </div>
 
         {/* Precio */}
         <div className="mt-auto pt-3">
           <p className="font-mono font-medium text-primary">
-            {formatColones(producto.precio)}{' '}
+            {formatColones(animal.price)}{' '}
             <span className="text-xs font-normal text-foreground/50">I.V.A.I.</span>
           </p>
         </div>
@@ -139,7 +155,8 @@ export function ProductCard({ producto }: ProductCardProps) {
         }`}
       >
         <button
-          disabled={!producto.disponible}
+          disabled={!disponible}
+          onClick={handleAddToCart}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ShoppingCart className="h-3.5 w-3.5" />
