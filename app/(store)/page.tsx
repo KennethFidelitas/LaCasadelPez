@@ -219,7 +219,7 @@ export default async function HomePage() {
               Selecciona dimensiones, tipo de vidrio, acabados y recibe una cotización al instante.
             </p>
             <Button size="lg" className="mt-8" asChild>
-              <Link href="/configurador">
+              <Link href="/armaTuPecera">
                 Iniciar Configurador
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>

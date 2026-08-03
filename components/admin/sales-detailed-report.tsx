@@ -272,121 +272,122 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
   return (
     <section className="grid gap-6">
       <Card className="rounded-lg">
-        <CardHeader>
-          <CardTitle>Reporte detallado de ventas</CardTitle>
-          <CardDescription>Filtra, revisa líneas de venta y exporta el desempeño comercial por periodo.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ReportMetric label="Ventas brutas" value={formatPrice(totals.grossSales)} />
-            <ReportMetric label="Ventas pagadas" value={formatPrice(totals.confirmedSales)} />
-            <ReportMetric label="Transacciones" value={String(totals.transactions)} />
-            <ReportMetric label="Ticket promedio" value={formatPrice(totals.averageTicket)} />
-            <ReportMetric label="Unidades vendidas" value={String(totals.itemCount)} />
-            <ReportMetric label="Operaciones pagadas" value={String(totals.paidTransactions)} />
-            <ReportMetric label="Pendiente de cobro" value={formatPrice(totals.pendingPaymentAmount)} />
-            <ReportMetric
-              label="Canal principal"
-              value={commercialBreakdown.channels[0]?.label ?? 'Sin ventas'}
-            />
-          </div>
+  <CardHeader>
+    <CardTitle>Reporte detallado de ventas</CardTitle>
+    <CardDescription>Filtra, revisa líneas de venta y exporta el desempeño comercial por periodo.</CardDescription>
+  </CardHeader>
+  <CardContent className="grid gap-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ReportMetric label="Ventas brutas" value={formatPrice(totals.grossSales)} />
+      <ReportMetric label="Ventas pagadas" value={formatPrice(totals.confirmedSales)} />
+      <ReportMetric label="Transacciones" value={String(totals.transactions)} />
+      <ReportMetric label="Ticket promedio" value={formatPrice(totals.averageTicket)} />
+      <ReportMetric label="Unidades vendidas" value={String(totals.itemCount)} />
+      <ReportMetric label="Operaciones pagadas" value={String(totals.paidTransactions)} />
+      <ReportMetric label="Pendiente de cobro" value={formatPrice(totals.pendingPaymentAmount)} />
+      <ReportMetric
+        label="Canal principal"
+        value={commercialBreakdown.channels[0]?.label ?? 'Sin ventas'}
+      />
+    </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <FilterField label="Desde">
-              <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-            </FilterField>
-            <FilterField label="Hasta">
-              <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-            </FilterField>
-            <FilterField label="Canal">
-              <Select value={channel} onValueChange={(value) => setChannel(value as ChannelFilter)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="POS">POS</SelectItem>
-                  <SelectItem value="Online">Online</SelectItem>
-                  <SelectItem value="Telefono">Telefono</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Estado">
-              <Select value={status} onValueChange={(value) => setStatus(value as StatusFilter)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="Pendiente">Pendiente</SelectItem>
-                  <SelectItem value="Confirmado">Confirmado</SelectItem>
-                  <SelectItem value="Preparacion">Preparacion</SelectItem>
-                  <SelectItem value="Enviado">Enviado</SelectItem>
-                  <SelectItem value="Entregado">Entregado</SelectItem>
-                  <SelectItem value="Cancelado">Cancelado</SelectItem>
-                  <SelectItem value="Reembolsado">Reembolsado</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Pago">
-              <Select value={paymentStatus} onValueChange={(value) => setPaymentStatus(value as PaymentStatusFilter)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="Pendiente">Pendiente</SelectItem>
-                  <SelectItem value="Pagado">Pagado</SelectItem>
-                  <SelectItem value="Fallido">Fallido</SelectItem>
-                  <SelectItem value="Reembolsado">Reembolsado</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Método">
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {paymentMethods.map((method) => (
-                    <SelectItem key={method} value={method}>{method}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Buscar">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className="pl-8"
-                  placeholder="Pedido, cliente o producto"
-                />
-              </div>
-            </FilterField>
-            <div className="flex items-end gap-2">
-              <Button type="button" className="flex-1" onClick={() => setGeneratedAt(new Date().toISOString())}>
-                <FileText className="mr-2 h-4 w-4" />
-                Generar
-              </Button>
-              <Button type="button" variant="outline" className="flex-1" onClick={handleExportCsv} disabled={filteredSales.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Button>
-              <Button type="button" variant="outline" className="flex-1" onClick={handleExportPdf} disabled={filteredSales.length === 0}>
-                <FileDown className="mr-2 h-4 w-4" />
-                PDF
-              </Button>
-              <Button type="button" variant="outline" className="flex-1" onClick={() => window.print()} disabled={filteredSales.length === 0}>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <FilterField label="Desde">
+        <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+      </FilterField>
+      <FilterField label="Hasta">
+        <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+      </FilterField>
+      <FilterField label="Canal">
+        <Select value={channel} onValueChange={(value) => setChannel(value as ChannelFilter)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="POS">POS</SelectItem>
+            <SelectItem value="Online">Online</SelectItem>
+            <SelectItem value="Telefono">Telefono</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField label="Estado">
+        <Select value={status} onValueChange={(value) => setStatus(value as StatusFilter)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="Pendiente">Pendiente</SelectItem>
+            <SelectItem value="Confirmado">Confirmado</SelectItem>
+            <SelectItem value="Preparacion">Preparacion</SelectItem>
+            <SelectItem value="Enviado">Enviado</SelectItem>
+            <SelectItem value="Entregado">Entregado</SelectItem>
+            <SelectItem value="Cancelado">Cancelado</SelectItem>
+            <SelectItem value="Reembolsado">Reembolsado</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField label="Pago">
+        <Select value={paymentStatus} onValueChange={(value) => setPaymentStatus(value as PaymentStatusFilter)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="Pendiente">Pendiente</SelectItem>
+            <SelectItem value="Pagado">Pagado</SelectItem>
+            <SelectItem value="Fallido">Fallido</SelectItem>
+            <SelectItem value="Reembolsado">Reembolsado</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField label="Método">
+        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {paymentMethods.map((method) => (
+              <SelectItem key={method} value={method}>{method}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+      <FilterField label="Buscar">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="pl-8"
+            placeholder="Pedido, cliente o producto"
+          />
+        </div>
+      </FilterField>
+
+      <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4 xl:col-span-4">
+        <Button type="button" className="w-full" onClick={() => setGeneratedAt(new Date().toISOString())}>
+          <FileText className="mr-2 h-4 w-4" />
+          Generar
+        </Button>
+        <Button type="button" variant="outline" className="w-full" onClick={handleExportCsv} disabled={filteredSales.length === 0}>
+          <Download className="mr-2 h-4 w-4" />
+          Exportar
+        </Button>
+        <Button type="button" variant="outline" className="w-full" onClick={handleExportPdf} disabled={filteredSales.length === 0}>
+          <FileDown className="mr-2 h-4 w-4" />
+          PDF
+        </Button>
+        <Button type="button" variant="outline" className="w-full" onClick={() => window.print()} disabled={filteredSales.length === 0}>
+          <Printer className="mr-2 h-4 w-4" />
+          Imprimir
+        </Button>
+      </div>
+    </div>
+  </CardContent>
+</Card>
 
       <Card className="rounded-lg">
         <CardHeader>

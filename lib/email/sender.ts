@@ -163,6 +163,36 @@ export async function sendWelcomeAccessEmail(params: {
   })
 }
 
+// ─── Bienvenida para registro autogestionado (auth/auth-form.tsx) 
+
+export async function sendSelfRegistrationWelcomeEmail(params: {
+  to: string
+  firstName: string
+}): Promise<SendResult> {
+  const html = baseTemplate(`
+    <p>Hola <strong>${params.firstName}</strong>,</p>
+    <p>¡Gracias por crear tu cuenta en <strong>La Casa del Pez</strong>!</p>
+    <div class="alert-box alert-green">
+      Tu registro se completó correctamente. Ya podés iniciar sesión con el correo y la
+      contraseña que elegiste.
+    </div>
+    <p>Desde tu cuenta vas a poder:</p>
+    <ul style="margin: 8px 0 12px 20px; font-size: 14px; color: #374151; line-height: 1.8;">
+      <li>Consultar el estado de tus pedidos en tiempo real</li>
+      <li>Ver el historial de compras</li>
+      <li>Gestionar tus datos de contacto</li>
+    </ul>
+    <a href="${SITE_URL}/auth/login" class="btn">Ir al inicio de sesión</a>
+  `, 'Bienvenido a La Casa del Pez')
+
+  return sendEmail({
+    to: params.to,
+    subject: '🐠 ¡Bienvenido a La Casa del Pez!',
+    html,
+    text: `Hola ${params.firstName}, gracias por registrarte en La Casa del Pez. Ya podés iniciar sesión en: ${SITE_URL}/auth/login`,
+  })
+}
+
 // ─── RF-ID-010 Alerta 1: Stock bajo 
 
 export async function sendLowStockAlert(params: {
@@ -175,7 +205,7 @@ export async function sendLowStockAlert(params: {
   const html = baseTemplate(`
     <p>Se ha detectado <strong>stock bajo</strong> en el inventario.</p>
     <div class="alert-box alert-yellow">
-      ⚠️ El stock del siguiente ítem está por debajo del umbral mínimo configurado.
+      El stock del siguiente ítem está por debajo del umbral mínimo configurado.
     </div>
     <table class="data">
       <tr><th>Ítem</th><td>${params.productName}</td></tr>
@@ -189,7 +219,7 @@ export async function sendLowStockAlert(params: {
 
   return sendEmail({
     to: ADMIN_EMAIL,
-    subject: `⚠️ Stock bajo: ${params.productName} (${params.currentStock} unidades)`,
+    subject: `Stock bajo: ${params.productName} (${params.currentStock} unidades)`,
     html,
     text: `ALERTA STOCK BAJO\nProducto: ${params.productName}\nStock actual: ${params.currentStock}\nUmbral mínimo: ${params.threshold}`,
   })
@@ -211,7 +241,7 @@ export async function sendOrderCancelledAlert(params: {
 
   const sharedContent = `
     <div class="alert-box alert-red">
-      🚫 La orden <strong>#${params.orderNumber}</strong> ha sido cancelada por ${cancelledByLabel}.
+      La orden <strong>#${params.orderNumber}</strong> ha sido cancelada por ${cancelledByLabel}.
     </div>
     <table class="data">
       <tr><th>Orden</th><td class="mono">#${params.orderNumber}</td></tr>
@@ -224,7 +254,7 @@ export async function sendOrderCancelledAlert(params: {
 
   const adminResult = await sendEmail({
     to: ADMIN_EMAIL,
-    subject: `🚫 Orden cancelada: #${params.orderNumber} — ${params.customerName}`,
+    subject: `Orden cancelada: #${params.orderNumber} — ${params.customerName}`,
     html: baseTemplate(`
       <p>Se ha cancelado una orden en el sistema.</p>
       ${sharedContent}
@@ -266,7 +296,7 @@ export async function sendCriticalErrorAlert(params: {
 
   const html = baseTemplate(`
     <div class="alert-box alert-red">
-      🔴 Se ha detectado un <strong>error crítico</strong> en el sistema que puede afectar la operación normal.
+       Se ha detectado un <strong>error crítico</strong> en el sistema que puede afectar la operación normal.
     </div>
     <table class="data">
       <tr><th>Hora</th><td class="mono">${timestamp}</td></tr>
@@ -283,7 +313,7 @@ export async function sendCriticalErrorAlert(params: {
 
   return sendEmail({
     to: ADMIN_EMAIL,
-    subject: `🔴 Error crítico del sistema — ${timestamp}`,
+    subject: `Error crítico del sistema — ${timestamp}`,
     html,
     text: `ERROR CRÍTICO\nHora: ${timestamp}\nContexto: ${params.context ?? 'No especificado'}\nError: ${params.errorMessage}`,
   })

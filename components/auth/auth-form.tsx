@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/forms/input'
 import { Label } from '@/components/ui/forms/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/navigation/tabs'
 import { createClient } from '@/lib/supabase/client'
+import { notifySelfRegistration } from '@/lib/customers/self-register'
 
 type AuthMode = 'login' | 'register'
 
@@ -90,6 +91,15 @@ export function AuthForm() {
         return
       }
 
+      // Enviar el correo de bienvenida al registro autogestionado. No bloqueamos
+      // ni revertimos el signUp si el correo falla: la cuenta ya quedó creada en
+      // Supabase Auth, solo se registra el error para revisión.
+      notifySelfRegistration({ email, firstName }).then((emailResult) => {
+        if (!emailResult.ok) {
+          console.error('[AuthForm] notifySelfRegistration failed:', emailResult.message)
+        }
+      })
+
       setMessage({
         type: 'success',
         title: 'Cuenta creada',
@@ -114,17 +124,12 @@ export function AuthForm() {
           <CardTitle>{mode === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}</CardTitle>
           <CardDescription>
             {mode === 'login'
-              ? 'Inicia sesión con tu cuenta real de Supabase.'
+              ? 'Inicia sesión con tu cuenta.'
               : 'Crea una cuenta real para clientes o equipo con permisos.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert className="mb-5">
-            <AlertTitle>Acceso real</AlertTitle>
-            <AlertDescription>
-              Este formulario usa autenticación real con Supabase.
-            </AlertDescription>
-          </Alert>
+         
 
           {message && (
             <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="mb-5">
