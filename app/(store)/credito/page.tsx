@@ -2,45 +2,23 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
+import { getCreditManagementData } from "@/lib/credits/actions"
+import type { CreditItem } from "@/lib/credits/types"
+import { formatPrice } from "@/lib/format"
 
 export default function ConsultarCreditosPage() {
-  const [creditos, setCreditos] = useState<any[]>([])
+  const [creditos, setCreditos] = useState<CreditItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const cargarCreditos = async () => {
       try {
-        const supabase = createClient()
-
-        console.log("🔍 Intentando cargar créditos...")
-
-        // Obtener créditos con información del cliente
-        const { data, error } = await supabase
-          .from("credits")
-          .select(`
-            id,
-            user_id,
-            amount,
-            balance,
-            type,
-            description,
-            created_at
-          `)
-          .order("created_at", { ascending: false })
-
-        if (error) {
-          console.error("❌ Error de Supabase:", error)
-          throw error
-        }
-
-        console.log("✅ Créditos cargados:", data)
-        setCreditos(data || [])
-      } catch (err: any) {
-        console.error("🔴 Error completo cargando créditos:", err)
-        console.error("Mensaje:", err?.message)
-        console.error("Código:", err?.code)
+        const data = await getCreditManagementData()
+        setCreditos(data.credits)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudieron cargar los créditos.")
       } finally {
         setLoading(false)
       }
@@ -51,14 +29,18 @@ export default function ConsultarCreditosPage() {
 
   const creditosFiltrados = creditos.filter((credito) => {
     const searchLower = searchTerm.toLowerCase()
-    const tipo = (credito.type || "").toLowerCase()
-    const descripcion = (credito.description || "").toLowerCase()
-    return tipo.includes(searchLower) || descripcion.includes(searchLower)
+    return (
+      credito.customer.toLowerCase().includes(searchLower) ||
+      credito.seller.toLowerCase().includes(searchLower) ||
+      credito.status.toLowerCase().includes(searchLower) ||
+      credito.notes.toLowerCase().includes(searchLower) ||
+      credito.id.toLowerCase().includes(searchLower)
+    )
   })
 
   const totalCreditos = creditos.length
-  const creditosActivos = creditos.filter((c) => c.balance > 0).length
-  const saldoTotal = creditos.reduce((total, credito) => total + (credito.balance || 0), 0)
+  const creditosActivos = creditos.filter((credito) => credito.status === "Activo").length
+  const saldoTotal = creditos.reduce((total, credito) => total + credito.balance, 0)
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES")
@@ -103,7 +85,7 @@ export default function ConsultarCreditosPage() {
           <div className="rounded-xl border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Saldo total pendiente</p>
             <p className="mt-2 text-2xl font-bold">
-              ₡{saldoTotal.toLocaleString()}
+              {formatPrice(saldoTotal)}
             </p>
           </div>
         </section>
@@ -120,14 +102,16 @@ export default function ConsultarCreditosPage() {
             </div>
 
             <input
-              placeholder="Buscar por tipo o descripción"
+              placeholder="Buscar por cliente, vendedor, estado o descripción"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-md border px-3 py-2 md:max-w-md"
             />
           </div>
 
-          {loading ? (
+          {error ? (
+            <div className="py-8 text-center text-red-600">{error}</div>
+          ) : loading ? (
             <div className="py-8 text-center text-slate-500">Cargando créditos...</div>
           ) : creditosFiltrados.length === 0 ? (
             <div className="py-8 text-center text-slate-500">
@@ -138,8 +122,8 @@ export default function ConsultarCreditosPage() {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="py-3">Usuario ID</th>
-                    <th className="py-3">Tipo</th>
+                    <th className="py-3">Crédito</th>
+                    <th className="py-3">Cliente</th>
                     <th className="py-3">Monto</th>
                     <th className="py-3">Saldo</th>
                     <th className="py-3">Descripción</th>
@@ -150,20 +134,18 @@ export default function ConsultarCreditosPage() {
 
                 <tbody>
                   {creditosFiltrados.map((credito) => {
-                    const saldo = credito.balance || 0
-                    const monto = credito.amount || 0
-                    const estaActivo = saldo > 0
+                    const estaActivo = credito.status === "Activo"
 
                     return (
                       <tr key={credito.id} className="border-b last:border-0">
-                        <td className="py-3 font-medium text-xs">{credito.user_id || "-"}</td>
-                        <td className="py-3">{credito.type || "-"}</td>
-                        <td className="py-3">₡{monto.toLocaleString()}</td>
+                        <td className="py-3 font-medium text-xs">CR-{credito.id.slice(0, 8).toUpperCase()}</td>
+                        <td className="py-3">{credito.customer}</td>
+                        <td className="py-3">{formatPrice(credito.amount)}</td>
                         <td className="py-3 font-medium">
-                          ₡{saldo.toLocaleString()}
+                          {formatPrice(credito.balance)}
                         </td>
                         <td className="py-3 text-slate-500">
-                          {credito.description || "-"}
+                          {credito.notes || "-"}
                         </td>
                         <td className="py-3">
                           <span
@@ -173,11 +155,11 @@ export default function ConsultarCreditosPage() {
                                 : "rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
                             }
                           >
-                            {estaActivo ? "Activo" : "Cancelado"}
+                            {credito.status}
                           </span>
                         </td>
                         <td className="py-3 text-slate-500">
-                          {formatDate(credito.created_at)}
+                          {formatDate(credito.createdAt)}
                         </td>
                       </tr>
                     )
