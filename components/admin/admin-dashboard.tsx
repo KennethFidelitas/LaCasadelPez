@@ -1479,29 +1479,16 @@ async function sendTestEmail() {
                             <TableCell>{item.min}</TableCell>
                             <TableCell>{formatPrice(item.cost)}</TableCell>
                             <TableCell>
-                              {item.type === 'animal' ? (
-                                <DialogoAjusteStock
-                                  animal={{
-                                    id: item.id,
-                                    name: item.name,
-                                    sku: item.sku,
-                                    stock: item.stock,
-                                  }}
-                                  onAjusteRealizado={cargarInventario}
-                                />
-                              ) : (
-                                <UiTooltip>
-                                  <TooltipTrigger asChild>
-                                    <span tabIndex={0} className="inline-block">
-                                      <Button size="sm" variant="outline" disabled>
-                                        <Boxes className="h-4 w-4" />
-                                        Stock
-                                      </Button>
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Próximamente</TooltipContent>
-                                </UiTooltip>
-                              )}
+                              <DialogoAjusteStock
+                                item={{
+                                  id: item.id,
+                                  type: item.type,
+                                  name: item.name,
+                                  sku: item.sku,
+                                  stock: item.stock,
+                                }}
+                                onAjusteRealizado={cargarInventario}
+                              />
                             </TableCell>
                             <TableCell>
                               {item.type === 'animal' ? (

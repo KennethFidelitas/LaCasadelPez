@@ -7,14 +7,14 @@ import { toast } from 'sonner'
 import { ArrowDownCircle, ArrowUpCircle, Boxes } from 'lucide-react'
 
 import {
-  registroEntradaSchema,
-  type RegistroEntradaValues,
+  entradaItemSchema,
+  type EntradaItemValues,
   registroMuerteSchema,
   type RegistroMuerteValues,
   CAUSAS_MUERTE,
   CAUSA_MUERTE_LABELS,
 } from '@/lib/inventario/schemas'
-import { registrarEntradaAnimal, registrarMuerteAnimal } from '@/lib/inventario/actions'
+import { registrarEntradaInventario, registrarMuerteAnimal } from '@/lib/inventario/actions'
 
 import { Button } from '@/components/ui/actions/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/actions/toggle-group'
@@ -41,26 +41,26 @@ import {
 
 type TipoAjuste = 'entrada' | 'baja'
 
-interface AnimalAjustable {
+interface ItemAjustable {
   id: string
+  type: 'animal' | 'product'
   name: string
   sku: string
   stock: number
 }
 
 interface DialogoAjusteStockProps {
-  animal: AnimalAjustable
+  item: ItemAjustable
   onAjusteRealizado?: () => void
 }
 
-export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteStockProps) {
+export function DialogoAjusteStock({ item, onAjusteRealizado }: DialogoAjusteStockProps) {
   const [open, setOpen] = useState(false)
   const [tipo, setTipo] = useState<TipoAjuste>('entrada')
 
   const today = new Date().toLocaleDateString('en-CA')
 
-  const entradaDefaults: RegistroEntradaValues = {
-    animal_id: animal.id,
+  const entradaDefaults: EntradaItemValues = {
     quantity: '' as unknown as number,
     purchase_price: '' as unknown as number,
     supplier: '',
@@ -69,15 +69,15 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
   }
 
   const bajaDefaults: RegistroMuerteValues = {
-    animal_id: animal.id,
+    animal_id: item.id,
     quantity: '' as unknown as number,
     recorded_at: today,
     reason: undefined as unknown as RegistroMuerteValues['reason'],
     notes: '',
   }
 
-  const entradaForm = useForm<RegistroEntradaValues>({
-    resolver: zodResolver(registroEntradaSchema),
+  const entradaForm = useForm<EntradaItemValues>({
+    resolver: zodResolver(entradaItemSchema),
     defaultValues: entradaDefaults,
   })
 
@@ -97,9 +97,9 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
     }
   }
 
-  async function onSubmitEntrada(values: RegistroEntradaValues) {
+  async function onSubmitEntrada(values: EntradaItemValues) {
     try {
-      await registrarEntradaAnimal(values)
+      await registrarEntradaInventario({ ...values, itemType: item.type, itemId: item.id })
       toast.success('Entrada registrada correctamente')
       onAjusteRealizado?.()
       handleOpenChange(false)
@@ -110,9 +110,9 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
   }
 
   async function onSubmitBaja(values: RegistroMuerteValues) {
-    if (values.quantity > animal.stock) {
+    if (values.quantity > item.stock) {
       bajaForm.setError('quantity', {
-        message: `La cantidad no puede superar el stock actual (${animal.stock})`,
+        message: `La cantidad no puede superar el stock actual (${item.stock})`,
       })
       return
     }
@@ -143,14 +143,14 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
         <DialogHeader>
           <DialogTitle>Ajustar stock</DialogTitle>
           <DialogDescription>
-            {animal.sku} — {animal.name}
+            {item.sku} — {item.name}
           </DialogDescription>
         </DialogHeader>
 
         <Card className="bg-muted/40">
           <CardContent className="py-4 text-center">
             <p className="text-sm text-muted-foreground">Stock actual</p>
-            <p className="text-3xl font-bold text-foreground">{animal.stock}</p>
+            <p className="text-3xl font-bold text-foreground">{item.stock}</p>
             <p className="text-xs text-muted-foreground">unidades</p>
           </CardContent>
         </Card>
@@ -176,6 +176,7 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
             </ToggleGroupItem>
             <ToggleGroupItem
               value="baja"
+              disabled={item.type === 'product'}
               className="h-auto flex-col gap-1 rounded-md py-3 data-[variant=outline]:border-l data-[state=on]:border-accent data-[state=on]:bg-accent/10 data-[state=on]:text-accent"
             >
               <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -285,7 +286,7 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
                   id="baja-quantity"
                   type="number"
                   min="1"
-                  max={animal.stock}
+                  max={item.stock}
                   placeholder="Ej: 3"
                   {...bajaForm.register('quantity')}
                   aria-invalid={!!bajaForm.formState.errors.quantity}
@@ -295,9 +296,9 @@ export function DialogoAjusteStock({ animal, onAjusteRealizado }: DialogoAjusteS
                     {bajaForm.formState.errors.quantity.message}
                   </p>
                 )}
-                {cantidadBaja > 0 && cantidadBaja > animal.stock && (
+                {cantidadBaja > 0 && cantidadBaja > item.stock && (
                   <p className="text-xs text-destructive">
-                    No puede superar el stock actual ({animal.stock})
+                    No puede superar el stock actual ({item.stock})
                   </p>
                 )}
               </div>

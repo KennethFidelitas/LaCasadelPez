@@ -30,6 +30,14 @@ export const registroEntradaSchema = z.object({
 
 export type RegistroEntradaValues = z.infer<typeof registroEntradaSchema>
 
+// ─── Entrada genérica (modal "Ajustar stock") ─────────────────────────────────
+// Mismos campos/validación que registroEntradaSchema, sin animal_id: el modal
+// ya conoce el id del ítem (animal o producto) por props, no lo pide en el form.
+
+export const entradaItemSchema = registroEntradaSchema.omit({ animal_id: true })
+
+export type EntradaItemValues = z.infer<typeof entradaItemSchema>
+
 // ─── RF-INV-006: Registro de muerte de animales ───────────────────────────────
 
 export const CAUSAS_MUERTE = [

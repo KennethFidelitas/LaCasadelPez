@@ -3,48 +3,75 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { type RegistroEntradaValues, type RegistroMuerteValues } from './schemas'
+import { type EntradaItemValues, type RegistroMuerteValues } from './schemas'
 
-export async function registrarEntradaAnimal(values: RegistroEntradaValues) {
+export type RegistrarEntradaInventarioInput = EntradaItemValues & {
+  itemType: 'animal' | 'product'
+  itemId: string
+}
+
+// Reemplaza a la antigua registrarEntradaAnimal (animal-only). Genérica para
+// animal_id o product_id — inventory e inventory_entries soportan ambos
+// (ver scripts/001_core_schema.sql y scripts/011_inventory_entries_product_support.sql).
+export async function registrarEntradaInventario(input: RegistrarEntradaInventarioInput) {
   const supabase = createAdminClient()
+  const idColumn = input.itemType === 'animal' ? 'animal_id' : 'product_id'
 
-  // 1. Obtener el stock actual del animal
+  // 0. Usuario autenticado, para registered_by (trazabilidad contable)
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+
+  // 1. Obtener el stock actual del ítem
   const { data: inventario, error: errorInventario } = await supabase
     .from('inventory')
     .select('id, quantity')
-    .eq('animal_id', values.animal_id)
+    .eq(idColumn, input.itemId)
     .single()
 
   if (errorInventario) {
-    throw new Error(`No se encontró el inventario del animal: ${errorInventario.message}`)
+    throw new Error(`No se encontró el inventario: ${errorInventario.message}`)
   }
 
   // 2. Registrar la entrada en inventory_entries
-  const { error: errorEntrada } = await supabase.from('inventory_entries').insert({
-    animal_id: values.animal_id,
-    quantity: values.quantity,
-    purchase_price: values.purchase_price,
-    supplier: values.supplier ?? null,
-    entry_date: values.entry_date,
-    notes: values.notes ?? null,
-  })
+  const { data: entradaInsertada, error: errorEntrada } = await supabase
+    .from('inventory_entries')
+    .insert({
+      [idColumn]: input.itemId,
+      quantity: input.quantity,
+      purchase_price: input.purchase_price,
+      supplier: input.supplier ?? null,
+      entry_date: input.entry_date,
+      notes: input.notes ?? null,
+      registered_by: user?.id ?? null,
+    })
+    .select('id')
+    .single()
 
-  if (errorEntrada) {
-    throw new Error(`Error al registrar la entrada: ${errorEntrada.message}`)
+  if (errorEntrada || !entradaInsertada) {
+    throw new Error(`Error al registrar la entrada: ${errorEntrada?.message}`)
   }
 
-  // 3. Sumar la cantidad al stock actual en inventory
+  // 3. Sumar la cantidad al stock actual en inventory.
+  //    No hay transacción real (no existe un RPC en Postgres para esto todavía;
+  //    sería la forma correcta de garantizar atomicidad real). Como mitigación,
+  //    si este update falla se revierte manualmente la entrada recién insertada
+  //    para no dejar un movimiento huérfano que no sumó stock.
   const { error: errorUpdate } = await supabase
     .from('inventory')
-    .update({ quantity: inventario.quantity + values.quantity })
+    .update({ quantity: inventario.quantity + input.quantity })
     .eq('id', inventario.id)
 
   if (errorUpdate) {
-    throw new Error(`Error al actualizar el stock: ${errorUpdate.message}`)
+    await supabase.from('inventory_entries').delete().eq('id', entradaInsertada.id)
+    throw new Error(`Error al actualizar el stock (la entrada fue revertida): ${errorUpdate.message}`)
   }
 
-  revalidatePath('/inventario/agregar-animal')
-  revalidatePath('/inventario/consultar-animales')
+  if (input.itemType === 'animal') {
+    revalidatePath('/inventario/agregar-animal')
+    revalidatePath('/inventario/consultar-animales')
+  }
+  // No hay páginas de producto todavía (formularios de alta/edición de
+  // producto quedaron para un paso posterior) — nada más que revalidar.
 }
 
 // ─── RF-INV-006: Registrar muerte de animales ─────────────────────────────────

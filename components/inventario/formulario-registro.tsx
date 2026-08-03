@@ -9,7 +9,7 @@ import { Check, ChevronsUpDown, Package } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { registroEntradaSchema, type RegistroEntradaValues } from '@/lib/inventario/schemas'
-import { registrarEntradaAnimal } from '@/lib/inventario/actions'
+import { registrarEntradaInventario } from '@/lib/inventario/actions'
 
 import { Button } from '@/components/ui/actions/button'
 import { Input } from '@/components/ui/forms/input'
@@ -71,7 +71,8 @@ export function FormularioRegistro({ animales }: FormularioRegistroProps) {
 
   async function onSubmit(values: RegistroEntradaValues) {
     try {
-      await registrarEntradaAnimal(values)
+      const { animal_id, ...entrada } = values
+      await registrarEntradaInventario({ ...entrada, itemType: 'animal', itemId: animal_id })
       toast.success('Entrada registrada correctamente')
       router.push('/inventario/consultar-animales')
       router.refresh()
