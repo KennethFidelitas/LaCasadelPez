@@ -59,7 +59,7 @@ export async function requestPasswordReset(input: unknown): Promise<{
     }
 
     const siteUrl = getSiteUrl()
-    const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`
+    const redirectTo = `${siteUrl}/auth/confirm?next=/auth/reset-password`
     const supabase = createAdminClient()
     const { data, error } = await supabase.auth.admin.generateLink({
       type: 'recovery',
@@ -76,7 +76,10 @@ export async function requestPasswordReset(input: unknown): Promise<{
       }
     }
 
-    const resetUrl = data.properties?.action_link
+    const tokenHash = data.properties?.hashed_token
+    const resetUrl = tokenHash
+      ? `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery&next=/auth/reset-password`
+      : null
 
     if (!resetUrl) {
       return {

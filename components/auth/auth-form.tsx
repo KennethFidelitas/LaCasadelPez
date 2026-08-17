@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, LogIn, Mail, UserPlus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/display/alert'
@@ -36,6 +36,26 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isResetLoading, setIsResetLoading] = useState(false)
   const [message, setMessage] = useState<AuthMessage | null>(null)
+
+  useEffect(() => {
+    const error = searchParams.get('error')
+
+    if (error === 'reset_link_expired') {
+      setMessage({
+        type: 'error',
+        title: 'Enlace vencido',
+        description: 'El enlace para restablecer la contraseña ya expiró o no es válido. Solicitá uno nuevo.',
+      })
+    }
+
+    if (error === 'auth_callback') {
+      setMessage({
+        type: 'error',
+        title: 'No se pudo validar el acceso',
+        description: 'Intentá iniciar sesión nuevamente.',
+      })
+    }
+  }, [searchParams])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
