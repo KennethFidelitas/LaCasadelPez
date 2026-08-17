@@ -48,6 +48,7 @@ export async function requestPasswordReset(input: unknown): Promise<{
   const email = parsed.data.email
 
   try {
+    console.info('[Password reset] Solicitud recibida:', maskEmail(email))
     const user = await findAuthUserByEmail(email)
 
     if (!user) {
@@ -88,14 +89,25 @@ export async function requestPasswordReset(input: unknown): Promise<{
       }
     }
 
+    console.info('[Password reset] Link generado:', maskEmail(email))
+
     const emailResult = await sendPasswordResetEmail({ to: email, resetUrl })
 
     if (!emailResult.ok) {
+      console.error('[Password reset] Resend rechazó el correo:', {
+        to: maskEmail(email),
+        error: emailResult.error,
+      })
       return {
         ok: false,
         message: emailResult.error ?? 'No se pudo enviar el correo de recuperación.',
       }
     }
+
+    console.info('[Password reset] Correo aceptado por Resend:', {
+      to: maskEmail(email),
+      id: emailResult.id,
+    })
 
     if (!process.env.RESEND_API_KEY) {
       console.info('[Password reset] RESEND_API_KEY no configurada. Link para prueba local:', {
@@ -110,7 +122,10 @@ export async function requestPasswordReset(input: unknown): Promise<{
 
     return {
       ok: true,
-      message: 'Si el correo está registrado, recibirás un enlace para crear una nueva contraseña.',
+      message:
+        process.env.NODE_ENV === 'development'
+          ? `Correo aceptado por Resend${emailResult.id ? ` (${emailResult.id})` : ''}. Revisá spam/cuarentena si no aparece en Outlook.`
+          : 'Si el correo está registrado, recibirás un enlace para crear una nueva contraseña.',
     }
   } catch (error) {
     return {

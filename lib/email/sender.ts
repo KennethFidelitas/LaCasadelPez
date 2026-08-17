@@ -25,6 +25,7 @@ function getResend(): Resend | null {
 
 export interface SendResult {
   ok: boolean
+  id?: string
   error?: string
 }
 
@@ -44,7 +45,7 @@ async function sendEmail(params: {
   }
 
   try {
-    const { error } = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: FROM,
       to: Array.isArray(params.to) ? params.to : [params.to],
       subject: params.subject,
@@ -57,7 +58,13 @@ async function sendEmail(params: {
       return { ok: false, error: error.message }
     }
 
-    return { ok: true }
+    console.info('[Email] Enviado via Resend:', {
+      id: data?.id,
+      to: params.to,
+      subject: params.subject,
+    })
+
+    return { ok: true, id: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error desconocido'
     console.error('[Email] Excepción:', msg)
