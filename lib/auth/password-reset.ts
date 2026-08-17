@@ -77,9 +77,9 @@ export async function requestPasswordReset(input: unknown): Promise<{
       }
     }
 
-    const actionLink = data.properties?.action_link
-    const resetUrl = actionLink
-      ? `${siteUrl}/auth/reset-link?link=${encodeURIComponent(actionLink)}`
+    const tokenHash = data.properties?.hashed_token
+    const resetUrl = tokenHash
+      ? `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&next=/auth/reset-password`
       : null
 
     if (!resetUrl) {

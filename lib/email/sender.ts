@@ -207,18 +207,18 @@ export async function sendPasswordResetEmail(params: {
 }): Promise<SendResult> {
   const html = baseTemplate(`
     <p>Hola,</p>
-    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>La Casa del Pez</strong>.</p>
+    <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta en <strong>La Casa del Pez</strong>.</p>
     <div class="alert-box alert-blue">
-      Este enlace es temporal. Si no solicitaste este cambio, podés ignorar este correo.
+      Este enlace es temporal. Si no solicitaste este cambio, podés ignorar este mensaje.
     </div>
-    <a href="${params.resetUrl}" class="btn">Crear nueva contraseña</a>
-  `, 'Restablecer contraseña')
+    <a href="${params.resetUrl}" class="btn">Cambiar contraseña</a>
+  `, 'Cambio de contraseña')
 
   return sendEmail({
     to: params.to,
-    subject: 'Restablecer contraseña - La Casa del Pez',
+    subject: 'Cambio de contraseña - La Casa del Pez',
     html,
-    text: `Restablecé tu contraseña en este enlace: ${params.resetUrl}`,
+    text: `Solicitaste cambiar la contraseña de tu cuenta en La Casa del Pez. Abrí este enlace: ${params.resetUrl}`,
   })
 }
 
