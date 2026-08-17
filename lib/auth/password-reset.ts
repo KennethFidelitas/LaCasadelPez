@@ -1,8 +1,8 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { z } from 'zod'
 import { sendPasswordResetEmail } from '@/lib/email/sender'
+import { getSiteUrl } from '@/lib/site-url'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const resetSchema = z.object({
@@ -11,14 +11,6 @@ const resetSchema = z.object({
 
 function maskEmail(email: string) {
   return email.replace(/^(.).+(@.+)$/, '$1***$2')
-}
-
-async function getSiteUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-  if (configuredUrl) return configuredUrl
-
-  const headerStore = await headers()
-  return headerStore.get('origin') ?? 'http://localhost:3000'
 }
 
 async function findAuthUserByEmail(email: string) {
@@ -66,7 +58,7 @@ export async function requestPasswordReset(input: unknown): Promise<{
       }
     }
 
-    const siteUrl = await getSiteUrl()
+    const siteUrl = getSiteUrl()
     const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`
     const supabase = createAdminClient()
     const { data, error } = await supabase.auth.admin.generateLink({
@@ -124,4 +116,3 @@ export async function requestPasswordReset(input: unknown): Promise<{
     }
   }
 }
-

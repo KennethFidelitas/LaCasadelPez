@@ -4,10 +4,11 @@
 // RF-CL-002: credenciales de acceso para clientes
 
 import { Resend } from 'resend'
+import { getSiteUrl } from '@/lib/site-url'
 
 const FROM = process.env.EMAIL_FROM ?? 'La Casa del Pez <updates@lacasadelpez.com>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'kgomez90692@ufide.ac.cr'
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+const SITE_URL = getSiteUrl()
 
 // ─── Singleton del cliente Resend
 

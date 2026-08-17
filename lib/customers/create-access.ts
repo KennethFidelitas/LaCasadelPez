@@ -12,6 +12,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendWelcomeAccessEmail } from '@/lib/email/sender'
+import { getSiteUrl } from '@/lib/site-url'
 
 export type CreateAccessResult =
   | { ok: true; userId: string; message: string }
@@ -60,7 +61,7 @@ export async function createClientAccess(params: {
         phone: params.phone ?? '',
         role: 'customer',
       },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      redirectTo: `${getSiteUrl()}/auth/callback`,
     },
   )
 
