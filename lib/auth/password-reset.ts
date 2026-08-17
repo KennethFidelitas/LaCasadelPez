@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 import { sendPasswordResetEmail } from '@/lib/email/sender'
+import { createPasswordResetToken } from '@/lib/auth/password-reset-token'
 import { getSiteUrl } from '@/lib/site-url'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -60,34 +61,8 @@ export async function requestPasswordReset(input: unknown): Promise<{
     }
 
     const siteUrl = getSiteUrl()
-    const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`
-    const supabase = createAdminClient()
-    const { data, error } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: {
-        redirectTo,
-      },
-    })
-
-    if (error) {
-      return {
-        ok: false,
-        message: error.message,
-      }
-    }
-
-    const tokenHash = data.properties?.hashed_token
-    const resetUrl = tokenHash
-      ? `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&next=/auth/reset-password`
-      : null
-
-    if (!resetUrl) {
-      return {
-        ok: false,
-        message: 'No se pudo generar el enlace de recuperación.',
-      }
-    }
+    const resetToken = createPasswordResetToken({ userId: user.id, email: email })
+    const resetUrl = `${siteUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`
 
     console.info('[Password reset] Link generado:', maskEmail(email))
 
