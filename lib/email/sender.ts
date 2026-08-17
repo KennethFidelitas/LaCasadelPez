@@ -193,6 +193,27 @@ export async function sendSelfRegistrationWelcomeEmail(params: {
   })
 }
 
+export async function sendPasswordResetEmail(params: {
+  to: string
+  resetUrl: string
+}): Promise<SendResult> {
+  const html = baseTemplate(`
+    <p>Hola,</p>
+    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>La Casa del Pez</strong>.</p>
+    <div class="alert-box alert-blue">
+      Este enlace es temporal. Si no solicitaste este cambio, podés ignorar este correo.
+    </div>
+    <a href="${params.resetUrl}" class="btn">Crear nueva contraseña</a>
+  `, 'Restablecer contraseña')
+
+  return sendEmail({
+    to: params.to,
+    subject: 'Restablecer contraseña - La Casa del Pez',
+    html,
+    text: `Restablecé tu contraseña en este enlace: ${params.resetUrl}`,
+  })
+}
+
 // ─── RF-ID-010 Alerta 1: Stock bajo 
 
 export async function sendLowStockAlert(params: {

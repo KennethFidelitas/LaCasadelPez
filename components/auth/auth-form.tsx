@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff, Loader2, LogIn, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogIn, Mail, UserPlus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/display/alert'
 import { Button } from '@/components/ui/actions/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/forms/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/navigation/tabs'
 import { createClient } from '@/lib/supabase/client'
 import { notifySelfRegistration } from '@/lib/customers/self-register'
+import { requestPasswordReset } from '@/lib/auth/password-reset'
 
 type AuthMode = 'login' | 'register'
 
@@ -33,6 +34,7 @@ export function AuthForm() {
   const [lastName, setLastName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isResetLoading, setIsResetLoading] = useState(false)
   const [message, setMessage] = useState<AuthMessage | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -112,6 +114,42 @@ export function AuthForm() {
     }
   }
 
+  async function handleForgotPassword() {
+    setMessage(null)
+
+    if (!email.trim()) {
+      setMessage({
+        type: 'error',
+        title: 'Correo requerido',
+        description: 'Ingresá tu correo para enviarte el enlace de recuperación.',
+      })
+      return
+    }
+
+    setIsResetLoading(true)
+
+    try {
+      const result = await requestPasswordReset({ email })
+
+      if (!result.ok) {
+        setMessage({
+          type: 'error',
+          title: 'No se pudo enviar el correo',
+          description: result.message,
+        })
+        return
+      }
+
+      setMessage({
+        type: 'success',
+        title: 'Revisa tu correo',
+        description: result.message,
+      })
+    } finally {
+      setIsResetLoading(false)
+    }
+  }
+
   return (
     <Tabs value={mode} onValueChange={(value) => setMode(value as AuthMode)} className="w-full">
       <TabsList className="grid w-full grid-cols-2">
@@ -162,6 +200,16 @@ export function AuthForm() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
                 Entrar
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={handleForgotPassword}
+                disabled={isLoading || isResetLoading}
+              >
+                {isResetLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Olvidé mi contraseña
               </Button>
             </form>
           </TabsContent>

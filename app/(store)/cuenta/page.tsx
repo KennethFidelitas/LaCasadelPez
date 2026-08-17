@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, ShieldCheck, User } from 'lucide-react'
+import { AccountProfileForm } from '@/components/account/account-profile-form'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { CustomerOrdersSummary } from '@/components/store/order-tracking'
 import { Badge } from '@/components/ui/display/badge'
@@ -28,16 +29,18 @@ export default async function AccountPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('first_name, last_name, email, role, created_at')
+    .select('first_name, last_name, email, phone, role, created_at')
     .eq('id', user.id)
     .maybeSingle()
 
+  const firstName = profile?.first_name || user.user_metadata?.first_name || ''
+  const lastName = profile?.last_name || user.user_metadata?.last_name || ''
   const displayName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
-    user.user_metadata?.first_name ||
+    [firstName, lastName].filter(Boolean).join(' ') ||
     user.email ||
     'Usuario'
   const email = profile?.email || user.email || 'Sin correo'
+  const phone = profile?.phone || user.user_metadata?.phone || ''
   const role = profile?.role || 'customer'
   const createdAt = profile?.created_at ? new Date(profile.created_at) : new Date(user.created_at)
   const orders = await getCustomerOrders(user.id, 8)
@@ -61,7 +64,22 @@ export default async function AccountPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
           <Card className="rounded-lg">
             <CardHeader>
-              <CardTitle>Informacion de acceso</CardTitle>
+              <CardTitle>Configuración del perfil</CardTitle>
+              <CardDescription>Actualizá tus datos personales.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AccountProfileForm
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
+                phone={phone}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg">
+            <CardHeader>
+              <CardTitle>Información de acceso</CardTitle>
               <CardDescription>Datos reales de tu cuenta en Supabase.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -94,7 +112,9 @@ export default async function AccountPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
 
+        <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
           <Card className="rounded-lg">
             <CardHeader>
               <CardTitle>Accesos</CardTitle>
