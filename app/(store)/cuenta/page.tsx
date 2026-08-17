@@ -47,7 +47,7 @@ export default async function AccountPage() {
 
   return (
     <div className="bg-muted/20">
-      <section className="mx-auto grid min-h-[calc(100vh-9rem)] max-w-5xl gap-6 px-4 py-10 sm:px-6 lg:px-8">
+      <section className="mx-auto flex min-h-[calc(100vh-9rem)] max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Badge variant="outline" className="mb-3">
@@ -115,24 +115,26 @@ export default async function AccountPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-          <Card className="rounded-lg">
+          <Card className="rounded-lg lg:col-span-2">
             <CardHeader>
               <CardTitle>Accesos</CardTitle>
               <CardDescription>Navegacion lista para mostrar el flujo al cliente.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3">
+            <CardContent className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">
                 Cuenta creada: {formatDate(createdAt)}
               </p>
-              <Button asChild>
-                <Link href="/tienda">Ir a tienda</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/cuenta/pedidos">Ver mis pedidos</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/">Volver al inicio</Link>
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link href="/tienda">Ir a tienda</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/cuenta/pedidos">Ver mis pedidos</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/">Volver al inicio</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
