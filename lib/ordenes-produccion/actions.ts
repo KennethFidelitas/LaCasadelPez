@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireStaffUser } from '@/lib/auth/session'
 import type { ProductionOrder } from '@/lib/types'
-import type { OrdenProduccionValues } from './schemas'
+import { ordenProduccionSchema } from './schemas'
 import { crearReporteOrdenesProduccion } from './report'
 
 export async function listarOrdenes(params?: {
@@ -58,7 +59,9 @@ export async function obtenerOrden(id: string) {
   return data
 }
 
-export async function crearOrden(values: OrdenProduccionValues) {
+export async function crearOrden(input: unknown) {
+  await requireStaffUser('/dashboard/ordenes-produccion/nueva')
+  const values = ordenProduccionSchema.parse(input)
   const supabase = createAdminClient()
   // order_number es auto-generado por trigger
   const { data, error } = await supabase
@@ -71,7 +74,9 @@ export async function crearOrden(values: OrdenProduccionValues) {
   return data
 }
 
-export async function actualizarOrden(id: string, values: Partial<OrdenProduccionValues>) {
+export async function actualizarOrden(id: string, input: unknown) {
+  await requireStaffUser('/dashboard/ordenes-produccion')
+  const values = ordenProduccionSchema.parse(input)
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('production_orders')

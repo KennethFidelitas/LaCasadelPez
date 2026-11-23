@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +21,7 @@ import { Separator } from '@/components/ui/layout/separator'
 import { crearOrden, actualizarOrden } from '@/lib/ordenes-produccion/actions'
 import {
   ordenProduccionSchema,
+  calcularTotalesOrden,
   PRODUCTION_STATUSES,
   PAYMENT_STATUSES,
   STATUS_LABELS,
@@ -59,9 +59,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
           materials_cost: orden.materials_cost,
           labor_cost: orden.labor_cost,
           accessories_cost: orden.accessories_cost,
-          subtotal: orden.subtotal,
           discount: orden.discount,
-          total: orden.total,
           deposit_paid: orden.deposit_paid,
           estimated_days: orden.estimated_days ?? undefined,
           customer_name: orden.customer_name ?? '',
@@ -76,9 +74,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
           materials_cost: 0,
           labor_cost: 0,
           accessories_cost: 0,
-          subtotal: 0,
           discount: 0,
-          total: 0,
           deposit_paid: 0,
         },
   })
@@ -89,12 +85,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
     name: ['materials_cost', 'labor_cost', 'accessories_cost', 'discount'],
   })
 
-  useEffect(() => {
-    const sub = (materialsCost ?? 0) + (laborCost ?? 0) + (accessoriesCost ?? 0)
-    const tot = Math.max(0, sub - (discount ?? 0))
-    setValue('subtotal', sub, { shouldValidate: false })
-    setValue('total', tot, { shouldValidate: false })
-  }, [materialsCost, laborCost, accessoriesCost, discount, setValue])
+  const { subtotal, total } = calcularTotalesOrden(materialsCost, laborCost, accessoriesCost, discount)
 
   async function onSubmit(values: OrdenProduccionValues) {
     try {
@@ -116,7 +107,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* ── Datos del cliente ────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -223,7 +214,9 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
               id="glass_type"
               placeholder="Ej. Templado 10 mm"
               {...register('glass_type')}
+              aria-invalid={!!errors.glass_type}
             />
+            {errors.glass_type && <p className="text-xs text-destructive">{errors.glass_type.message}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -323,7 +316,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
               step="0.01"
               readOnly
               className="bg-muted/50 cursor-default"
-              {...register('subtotal')}
+              value={subtotal}
             />
           </div>
 
@@ -353,7 +346,7 @@ export function FormularioOrden({ orden }: FormularioOrdenProps) {
               step="0.01"
               readOnly
               className="bg-muted/50 cursor-default font-semibold"
-              {...register('total')}
+              value={total}
             />
           </div>
 

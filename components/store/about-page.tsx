@@ -15,12 +15,12 @@ import { Button } from '@/components/ui/actions/button'
 const values = [
   {
     icon: HeartHandshake,
-    title: 'Acompanamiento real',
+    title: 'Acompañamiento real',
     description: 'Te ayudamos a elegir con criterio, desde el primer pez hasta tu proyecto completo.',
   },
   {
     icon: Ruler,
-    title: 'Diseno a tu medida',
+    title: 'Diseño a tu medida',
     description: 'Pensamos cada acuario para que encaje con tu espacio, estilo y presupuesto.',
   },
   {
@@ -31,9 +31,9 @@ const values = [
 ]
 
 const processSteps = [
-  { number: '01', title: 'Te escuchamos', text: 'Conocemos tu espacio, tus ideas y el tipo de vida acuatica que quieres crear.' },
+  { number: '01', title: 'Te escuchamos', text: 'Conocemos tu espacio, tus ideas y el tipo de vida acuática que quieres crear.' },
   { number: '02', title: 'Lo hacemos posible', text: 'Definimos dimensiones, materiales y equipamiento con una propuesta clara.' },
-  { number: '03', title: 'Te acompanamos', text: 'Te entregamos una solucion lista para disfrutar y el respaldo para mantenerla.' },
+  { number: '03', title: 'Te acompañamos', text: 'Te entregamos una solución lista para disfrutar y el respaldo para mantenerla.' },
 ]
 
 export function AboutPage() {
@@ -51,12 +51,12 @@ export function AboutPage() {
               Creamos espacios donde la vida se siente.
             </h1>
             <p className="mt-6 max-w-lg text-pretty text-lg leading-8 text-white/75">
-              En La Casa del Pez convertimos la acuariofilia en una experiencia cercana, bonita y bien pensada. Unimos conocimiento, cuidado y oficio para que tu mundo acuatico empiece con confianza.
+              En La Casa del Pez convertimos la acuariofilia en una experiencia cercana, bonita y bien pensada. Unimos conocimiento, cuidado y oficio para que tu mundo acuático empiece con confianza.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" className="bg-[#9de5db] text-[#102b3f] hover:bg-white" asChild>
                 <Link href="/armaTuPecera">
-                  Disena tu acuario
+                  Diseña tu acuario
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -78,7 +78,7 @@ export function AboutPage() {
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#102b3f]/90 to-transparent p-6 pt-20">
-                <p className="text-sm font-medium text-white/80">Diseno, fabricacion y asesoria</p>
+                <p className="text-sm font-medium text-white/80">Diseño, fabricación y asesoría</p>
                 <p className="mt-1 text-xl font-semibold">Tu idea, hecha acuario.</p>
               </div>
             </div>
@@ -146,10 +146,10 @@ export function AboutPage() {
         </div>
       </section>
 
-      <section className="border-t border-border bg-[#eaf7f5] py-14">
+      <section id="asesoria" className="scroll-mt-28 border-t border-border bg-[#eaf7f5] py-14">
         <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#102b3f]"><Wrench className="h-4 w-4" /> Tambien estamos para ayudarte</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#102b3f]"><Wrench className="h-4 w-4" /> También estamos para ayudarte</div>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#102b3f] sm:text-3xl">Tu próximo acuario puede empezar hoy.</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#315669]">Explora nuestros productos o crea una pecera a la medida con dimensiones y presupuesto definidos por ti.</p>
           </div>

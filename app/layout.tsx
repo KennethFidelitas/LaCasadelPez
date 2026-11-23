@@ -4,7 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Acuario La Casa del Pez | Peces Tropicales y Acuarios',
-  description: 'Tu tienda de confianza para peces tropicales, acuarios personalizados, accesorios y todo lo que necesitas para tu acuario. Expertos en acuarismo desde hace mas de 20 anos.',
+  description: 'Tu tienda de confianza para peces tropicales, acuarios personalizados, accesorios y todo lo que necesitas para tu acuario. Expertos en acuarismo desde hace más de 10 años.',
   keywords: ['acuario', 'peces tropicales', 'acuarios personalizados', 'tienda de peces', 'acuarismo', 'peceras'],
   generator: 'v0.app',
   icons: {

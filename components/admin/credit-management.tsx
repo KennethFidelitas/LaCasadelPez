@@ -21,6 +21,10 @@ const initialFormState = {
   notes: '',
 }
 
+function creditCode(id: string) {
+  return `CR-${id.slice(0, 8).toUpperCase()}`
+}
+
 export function CreditManagement() {
   const [credits, setCredits] = useState<CreditItem[]>([])
   const [customers, setCustomers] = useState<CreditCustomerOption[]>([])
@@ -30,6 +34,7 @@ export function CreditManagement() {
   const [creditForm, setCreditForm] = useState(initialFormState)
   const [isSaving, startSaving] = useTransition()
   const [isDeleting, startDeleting] = useTransition()
+  const editingCredit = credits.find((credit) => credit.id === editingCreditId)
 
   useEffect(() => {
     let cancelled = false
@@ -40,10 +45,6 @@ export function CreditManagement() {
         if (cancelled) return
         setCredits(data.credits)
         setCustomers(data.customers)
-        setCreditForm((current) => ({
-          ...current,
-          customerId: current.customerId || data.customers[0]?.id || '',
-        }))
       } catch (error) {
         if (!cancelled) {
           toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los créditos.')
@@ -61,10 +62,11 @@ export function CreditManagement() {
   }, [])
 
   const filteredCredits = useMemo(() => {
-    const term = creditSearch.toLowerCase()
+    const term = creditSearch.trim().toLowerCase()
     return credits.filter(
       (credit) =>
         credit.customer.toLowerCase().includes(term) ||
+        creditCode(credit.id).toLowerCase().includes(term) ||
         credit.id.toLowerCase().includes(term) ||
         credit.seller.toLowerCase().includes(term) ||
         credit.status.toLowerCase().includes(term),
@@ -93,10 +95,7 @@ export function CreditManagement() {
 
   function resetCreditForm() {
     setEditingCreditId(null)
-    setCreditForm({
-      ...initialFormState,
-      customerId: customers[0]?.id ?? '',
-    })
+    setCreditForm(initialFormState)
   }
 
   function handleCreditFieldChange(field: keyof typeof creditForm, value: string) {
@@ -140,7 +139,7 @@ export function CreditManagement() {
     setCreditForm({
       customerId: credit.customerId,
       amount: String(credit.amount),
-      paid: String(credit.paid),
+      paid: '0',
       dueDate: credit.dueDate,
       notes: credit.notes,
     })
@@ -235,8 +234,11 @@ export function CreditManagement() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-foreground">Monto abonado</label>
+                <label htmlFor="credit-payment" className="text-sm font-medium text-foreground">
+                  {editingCredit ? 'Nuevo abono' : 'Abono inicial'}
+                </label>
                 <Input
+                  id="credit-payment"
                   type="number"
                   min="0"
                   step="0.01"
@@ -244,6 +246,11 @@ export function CreditManagement() {
                   onChange={(event) => handleCreditFieldChange('paid', event.target.value)}
                   placeholder="0.00"
                 />
+                {editingCredit && (
+                  <p className="text-xs text-muted-foreground">
+                    Abonado {formatPrice(editingCredit.paid)} · Saldo actual {formatPrice(editingCredit.balance)}
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-foreground">Fecha limite</label>
@@ -336,7 +343,7 @@ export function CreditManagement() {
                   return (
                     <TableRow key={credit.id}>
                       <TableCell>
-                        <div className="font-medium">CR-{credit.id.slice(0, 8).toUpperCase()}</div>
+                        <div className="font-medium">{creditCode(credit.id)}</div>
                         <div className="text-xs text-muted-foreground">{credit.seller}</div>
                       </TableCell>
                       <TableCell>

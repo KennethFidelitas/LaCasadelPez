@@ -7,6 +7,15 @@ import { StepSection } from './StepSection'
 import { ResumenSidebar } from './ResumenSidebar'
 import { VistaPecera3D } from './VistaPecera3D'
 import {
+  CUSTOM_PECERA_ID,
+  DEFAULT_CUSTOM_DIMENSIONS,
+  DEFAULT_CUSTOM_GLASS_TYPE,
+  CustomPeceraCard,
+  calculateCustomLitros,
+  calculateCustomPrice,
+  formatCustomDimensions,
+} from './CustomPeceraCard'
+import {
   ACCESORIOS_OPCIONALES,
   FILTROS,
   ILUMINACIONES,
@@ -19,6 +28,7 @@ import type {
   AccesorioOpcional,
   AquariumMode,
   ArmaTuPeceraStateExtended,
+  CustomPeceraDimensions,
   Filtro,
   Fish,
   Iluminacion,
@@ -29,6 +39,13 @@ import type {
 
 const LITROS_POR_PEZ = 5
 const DRAFT_STORAGE_KEY = 'arma-tu-pecera-draft'
+const incompatibleTemperaments = new Set(['agresivo', 'predador', 'solitario'])
+
+function fishConflict(first: Fish, second: Fish) {
+  return first.incompatibleWith.includes(second.id) || second.incompatibleWith.includes(first.id) ||
+    (first.temperament === 'pacifico' && incompatibleTemperaments.has(second.temperament)) ||
+    (second.temperament === 'pacifico' && incompatibleTemperaments.has(first.temperament))
+}
 
 const INITIAL_STATE: ArmaTuPeceraStateExtended = {
   mode: null,
@@ -69,10 +86,18 @@ export function ArmaTuPeceraBuilder() {
     }
   }, [])
 
-  const selectedPecera = useMemo(
-    () => PECERAS.find(p => p.id === state.selectedPeceraId) ?? null,
-    [state.selectedPeceraId],
-  )
+  const customDimensions = state.customDimensions ?? DEFAULT_CUSTOM_DIMENSIONS
+  const customGlassType = state.customGlassType ?? DEFAULT_CUSTOM_GLASS_TYPE
+  const customAquarium = useMemo<Pecera>(() => ({
+    id: CUSTOM_PECERA_ID,
+    name: 'Pecera a la medida',
+    litros: calculateCustomLitros(customDimensions),
+    price: calculateCustomPrice(customDimensions, customGlassType),
+    dimensions: formatCustomDimensions(customDimensions),
+  }), [customDimensions, customGlassType])
+  const selectedPecera = state.selectedPeceraId === CUSTOM_PECERA_ID
+    ? customAquarium
+    : PECERAS.find(p => p.id === state.selectedPeceraId) ?? null
   const selectedFiltro = useMemo(
     () => FILTROS.find(f => f.id === state.selectedFiltroId) ?? null,
     [state.selectedFiltroId],
@@ -105,12 +130,7 @@ export function ArmaTuPeceraBuilder() {
     const blocked = new Set<string>()
     PECES.forEach(fish => {
       if (cartIds.has(fish.id)) return
-      const blockedByCart = fish.incompatibleWith.some(id => cartIds.has(id))
-      const blocksCart = [...cartIds].some(cartId => {
-        const cartFish = PECES.find(f => f.id === cartId)
-        return cartFish?.incompatibleWith.includes(fish.id) ?? false
-      })
-      if (blockedByCart || blocksCart) blocked.add(fish.id)
+      if (PECES.some((selected) => cartIds.has(selected.id) && fishConflict(fish, selected))) blocked.add(fish.id)
     })
     return blocked
   }, [state.fishQuantities])
@@ -231,6 +251,9 @@ export function ArmaTuPeceraBuilder() {
     setState(prev => {
       const fish = PECES.find(f => f.id === fishId)
       if (!fish) return prev
+      if (delta > 0 && PECES.some((selected) => (
+        selected.id !== fishId && (prev.fishQuantities[selected.id] ?? 0) > 0 && fishConflict(fish, selected)
+      ))) return prev
       const current = prev.fishQuantities[fishId] ?? 0
       const next = Math.max(0, Math.min(fish.maxQuantity, current + delta))
       const quantities = { ...prev.fishQuantities }
@@ -277,9 +300,26 @@ export function ArmaTuPeceraBuilder() {
   const handleClear = () => setState(INITIAL_STATE)
   const handlePrint = () => window.print()
 
+  function handleDimensionChange(key: keyof CustomPeceraDimensions, value: number) {
+    setState((current) => {
+      const dimensions = { ...(current.customDimensions ?? DEFAULT_CUSTOM_DIMENSIONS), [key]: value }
+      const liters = calculateCustomLitros(dimensions)
+      const compatible = (option?: { minLitros: number; maxLitros: number }) =>
+        !!option && liters >= option.minLitros && liters <= option.maxLitros
+      return {
+        ...current,
+        customDimensions: dimensions,
+        selectedFiltroId: compatible(FILTROS.find((filter) => filter.id === current.selectedFiltroId))
+          ? current.selectedFiltroId : null,
+        selectedIluminacionId: compatible(ILUMINACIONES.find((light) => light.id === current.selectedIluminacionId))
+          ? current.selectedIluminacionId : null,
+      }
+    })
+  }
+
   const step0Done = state.mode !== null
   const step1Done = state.waterType !== null
-  const step2Done = state.selectedPeceraId !== null
+  const step2Done = litrosBase > 0
   const step3Done = state.mode === 'prediseno' ? step2Done : state.selectedFiltroId !== null
   const step4Done = state.selectedIluminacionId !== null
   const densityPercent = litrosBase
@@ -450,6 +490,16 @@ export function ArmaTuPeceraBuilder() {
                       onClick={() => handleSelectPecera(pecera.id)}
                     />
                   ))}
+                  <CustomPeceraCard
+                    selected={state.selectedPeceraId === CUSTOM_PECERA_ID}
+                    dimensions={customDimensions}
+                    glassType={customGlassType}
+                    litros={customAquarium.litros}
+                    price={customAquarium.price}
+                    onSelect={() => handleSelectPecera(CUSTOM_PECERA_ID)}
+                    onChange={handleDimensionChange}
+                    onGlassChange={(glass) => setState((current) => ({ ...current, customGlassType: glass }))}
+                  />
                 </div>
               )}
             </StepSection>
@@ -598,7 +648,7 @@ export function ArmaTuPeceraBuilder() {
 
             <VistaPecera3D
               waterType={state.waterType}
-              peceraId={state.selectedPeceraId}
+              pecera={selectedPrediseno ?? selectedPecera}
               filtroId={state.selectedFiltroId}
               iluminacionId={state.selectedIluminacionId}
               accesoriosSeleccionados={state.accesoriosSeleccionados}
@@ -609,6 +659,7 @@ export function ArmaTuPeceraBuilder() {
           <div className="sticky top-4 self-start">
             <ResumenSidebar
               state={state}
+              selectedAquarium={selectedPrediseno ?? selectedPecera}
               total={total}
               litrosUsados={litrosUsados}
               totalPeces={totalPeces}

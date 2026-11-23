@@ -1,12 +1,15 @@
 'use client'
 
 import { X, Printer, ShoppingCart, Trash2, Bookmark, Droplets, Fish } from 'lucide-react'
-import { ACCESORIOS_OPCIONALES, FILTROS, ILUMINACIONES, PECERAS, PECERAS_PREDISENO, PECES, formatColones } from './data'
+import { ACCESORIOS_OPCIONALES, FILTROS, ILUMINACIONES, PECERAS_PREDISENO, PECES, formatColones } from './data'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/overlays/dialog'
-import type { ArmaTuPeceraStateExtended } from './types'
+import type { ArmaTuPeceraStateExtended, Pecera } from './types'
+
+const volumeFormat = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 1 })
 
 interface ResumenSidebarProps {
   state: ArmaTuPeceraStateExtended
+  selectedAquarium: Pecera | null
   total: number
   litrosUsados: number
   totalPeces: number
@@ -26,6 +29,7 @@ interface ResumenSidebarProps {
 
 export function ResumenSidebar({
   state,
+  selectedAquarium,
   total,
   litrosUsados,
   totalPeces,
@@ -42,12 +46,13 @@ export function ResumenSidebar({
   onPrint,
   hasDraft,
 }: ResumenSidebarProps) {
-  const selectedPecera = PECERAS.find(p => p.id === state.selectedPeceraId) ?? null
   const selectedPrediseno = PECERAS_PREDISENO.find(p => p.id === state.selectedPeceraId) ?? null
   const selectedFiltro = FILTROS.find(f => f.id === state.selectedFiltroId) ?? null
   const selectedIluminacion = ILUMINACIONES.find(l => l.id === state.selectedIluminacionId) ?? null
   const accesoriosActivos = ACCESORIOS_OPCIONALES.filter(a => state.accesoriosSeleccionados[a.id])
-  const selectedAquarium = selectedPrediseno ?? selectedPecera
+  const tankVolume = selectedAquarium
+    ? `${volumeFormat.format(selectedAquarium.litros)} L / ${volumeFormat.format(selectedAquarium.litros / 3.785411784)} gal`
+    : '—'
   const fishInCart = Object.entries(state.fishQuantities)
     .filter(([, qty]) => qty > 0)
     .map(([id, qty]) => ({ fish: PECES.find(f => f.id === id)!, qty }))
@@ -70,7 +75,7 @@ export function ResumenSidebar({
           <div className="mb-4 flex items-center justify-between rounded-lg bg-secondary px-3 py-2">
             <div className="flex items-center gap-1.5 text-xs text-foreground/70">
               <Droplets className="h-3.5 w-3.5" />
-              <span className="font-mono">{litrosUsados}L / {selectedAquarium.litros}L</span>
+              <span className="font-mono">{litrosUsados} L usados · {tankVolume}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-foreground/70">
               <Fish className="h-3.5 w-3.5" />
@@ -269,7 +274,7 @@ export function ResumenSidebar({
             </div>
             <div className="flex justify-between">
               <span>Litros usados</span>
-              <span>{selectedAquarium ? `${litrosUsados}L / ${selectedAquarium.litros}L` : '—'}</span>
+              <span>{tankVolume}</span>
             </div>
             <div className="flex justify-between">
               <span>Total de peces</span>

@@ -69,7 +69,7 @@ import {
   loadAlertConfig,
 } from '@/lib/dashboard-alerts-config'
 import { formatDateTime, formatPrice } from '@/lib/format'
-import { createPosSale } from '@/lib/pos/actions'
+import { createPosSale, getPosCashSession, setPosCashSession } from '@/lib/pos/actions'
 import type { PosCatalogProduct, PosReturnRequest, PosSaleRecord, PosSalesSummary, PosTopProduct } from '@/lib/pos/types'
 import type { ReporteOrdenesProduccion } from '@/lib/ordenes-produccion/report'
 import { updateReturnRequestStatus as saveReturnRequestStatus } from '@/lib/returns/actions'
@@ -170,7 +170,7 @@ const initialCustomerForm = {
 
 export function AdminDashboard({
   adminUserId,
-  posCatalog,
+  posCatalog: initialPosCatalog,
   posCatalogError = null,
   sales,
   salesError = null,
@@ -265,14 +265,18 @@ export function AdminDashboard({
     cargarInventario()
   }, [cargarInventario])
   const [discount, setDiscount] = useState(0)
+  const [posCatalog, setPosCatalog] = useState(initialPosCatalog)
+  const [lastTransactionId, setLastTransactionId] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<
   'efectivo' | 'tarjeta' | 'credito' | 'mixto'
 >('efectivo')
   const [cashReceived, setCashReceived] = useState(0)
   const [cardAmount, setCardAmount] = useState(0)
   const [creditAmount, setCreditAmount] = useState(0)
-  const [cashSessionOpen, setCashSessionOpen] = useState(true)
-  const [openingCash, setOpeningCash] = useState(120000)
+  const [cashSessionOpen, setCashSessionOpen] = useState(false)
+  const [cashSessionLoading, setCashSessionLoading] = useState(true)
+  const [isUpdatingCashSession, startCashSessionUpdate] = useTransition()
+  const [openingCash, setOpeningCash] = useState(0)
   const [closingCash, setClosingCash] = useState(0)
   const [cashNotes, setCashNotes] = useState("")
   const [apartarDialogOpen, setApartarDialogOpen] = useState(false)
@@ -299,7 +303,8 @@ export function AdminDashboard({
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cartItems],
   )
-  const total = subtotal - discount
+  const invalidDiscount = discount < 0 || discount > subtotal
+  const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100)
 
   const cashSalesAmount =
     paymentMethod === 'efectivo'
@@ -314,7 +319,7 @@ export function AdminDashboard({
 
   const cashChange =
     paymentMethod === 'efectivo' || paymentMethod === 'mixto'
-      ? Math.max(0, cashReceived - total)
+      ? Math.max(0, cashReceived - (total - (paymentMethod === 'mixto' ? cardAmount : 0)))
       : 0
 
   const getPaymentMethodLabel = (method: string) => {
@@ -325,15 +330,36 @@ export function AdminDashboard({
     return method
   }  
 
-  const handleOpenCashSession = () => {
-    setCashSessionOpen(true)
-    setClosingCash(0)
-    setCashNotes("")
-  }
+  useEffect(() => {
+    let active = true
+    getPosCashSession()
+      .then((session) => {
+        if (!active || !session) return
+        setCashSessionOpen(true)
+        setOpeningCash(session.openingCash)
+      })
+      .catch(() => { if (active) toast.error('No se pudo consultar el estado de la caja.') })
+      .finally(() => { if (active) setCashSessionLoading(false) })
+    return () => { active = false }
+  }, [])
 
-  const handleCloseCashSession = () => {
-    setCashSessionOpen(false)
-  }  
+  function handleChangeCashSession() {
+    startCashSessionUpdate(async () => {
+      try {
+        const session = await setPosCashSession(cashSessionOpen
+          ? { action: 'close', amount: closingCash, notes: cashNotes }
+          : { action: 'open', amount: openingCash })
+        setCashSessionOpen(Boolean(session))
+        if (session) {
+          setOpeningCash(session.openingCash)
+          setClosingCash(0)
+          setCashNotes('')
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la caja.')
+      }
+    })
+  }
   const filteredInventory = useMemo(() => {
     const term = inventorySearch.toLowerCase()
     return inventoryItems.filter(
@@ -471,52 +497,67 @@ export function AdminDashboard({
       return
     }
 
-    startSavingSale(() => {
-      void (async () => {
-        try {
-          const sale = await createPosSale({
-            items: cartItems,
-            discount,
-            paymentMethod: getPaymentMethodLabel(paymentMethod),
-          })
+    if (invalidDiscount) {
+      toast.error('El descuento debe estar entre cero y el subtotal.')
+      return
+    }
 
-          setOrders((current) => [
-            {
-              id: sale.orderId,
-              orderNumber: sale.orderNumber,
-              customer: 'Cliente de mostrador',
-              customerEmail: null,
-              channel: 'POS',
-              total: sale.total,
-              status: 'Confirmado',
-              rawStatus: 'confirmado',
-              paymentStatus: 'Pagado',
-              paymentMethod,
-              createdAt: new Date().toISOString(),
-              transactionNumber: sale.transactionNumber,
-            },
+    startSavingSale(async () => {
+      try {
+        const sale = await createPosSale({
+          items: cartItems,
+          discount,
+          paymentMethod: getPaymentMethodLabel(paymentMethod),
+          cashReceived,
+          cardAmount,
+          creditAmount,
+        })
+
+        setLastTransactionId(sale.transactionId)
+        setPosCatalog((current) => current.map((product) => ({
+          ...product,
+          stock: sale.stockByProduct[product.id] ?? product.stock,
+        })))
+        void cargarInventario()
+        setOrders((current) => [
+          {
+            id: sale.orderId,
+            orderNumber: sale.orderNumber,
+            customer: 'Cliente de mostrador',
+            customerEmail: null,
+            channel: 'POS',
+            total: sale.total,
+            status: 'Confirmado',
+            rawStatus: 'confirmado',
+            paymentStatus: 'Pagado',
+            paymentMethod,
+            createdAt: new Date().toISOString(),
+            transactionNumber: sale.transactionNumber,
+          },
+          ...current,
+        ])
+        setSummary((current) => {
+          const transactionsToday = current.transactionsToday + 1
+          const totalSalesToday = current.totalSalesToday + sale.total
+
+          return {
             ...current,
-          ])
-          setSummary((current) => {
-            const transactionsToday = current.transactionsToday + 1
-            const totalSalesToday = current.totalSalesToday + sale.total
+            totalSalesToday,
+            transactionsToday,
+            averageTicketToday: totalSalesToday / transactionsToday,
+            posSalesToday: current.posSalesToday + 1,
+          }
+        })
 
-            return {
-              ...current,
-              totalSalesToday,
-              transactionsToday,
-              averageTicketToday: totalSalesToday / transactionsToday,
-              posSalesToday: current.posSalesToday + 1,
-            }
-          })
-
-          setCartItems([])
-          setDiscount(0)
-          toast.success(`Venta ${sale.transactionNumber} registrada correctamente`)
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : 'No se pudo registrar la venta')
-        }
-      })()
+        setCartItems([])
+        setDiscount(0)
+        setCashReceived(0)
+        setCardAmount(0)
+        setCreditAmount(0)
+        toast.success(`Venta ${sale.transactionNumber} registrada correctamente`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo registrar la venta')
+      }
     })
   }
 
@@ -574,17 +615,23 @@ export function AdminDashboard({
   }
 
   function handleCreateCustomer() {
-    startSavingCustomer(() => {
-      void (async () => {
-        try {
-          const customer = await createCustomerContact(customerForm)
-          setCustomerRecords((current) => [customer, ...current])
-          setCustomerForm(initialCustomerForm)
-          toast.success(`Cliente ${customer.fullName} registrado correctamente`)
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : 'No se pudo registrar el cliente')
+    startSavingCustomer(async () => {
+      try {
+        const result = await createCustomerContact(customerForm)
+        if (!result.ok) {
+          toast.error(result.message)
+          return
         }
-      })()
+        setCustomerRecords((current) => [result.customer, ...current])
+        setCustomerForm(initialCustomerForm)
+        if (result.emailFailed) {
+          toast.warning(result.message)
+        } else {
+          toast.success(result.message)
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo registrar el cliente')
+      }
     })
   }
 
@@ -883,21 +930,20 @@ export function AdminDashboard({
                   <CardContent className="grid gap-5">
                     <div className="grid gap-3">
                       <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" asChild>
-                        <Link href="/ventas/imprimir-venta">
-                          Imprimir Factura
-                      </Link>
-                      </Button>
+                      {lastTransactionId ? (
+                        <Button variant="outline" asChild>
+                          <Link href={`/ventas/imprimir-venta/${lastTransactionId}`} target="_blank">
+                            Imprimir factura
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button variant="outline" disabled>Imprimir factura</Button>
+                      )}
                       <Button
                         variant={cashSessionOpen ? 'destructive' : 'default'}
                         size="sm"
-                        onClick={() => {
-                          if (cashSessionOpen) {
-                            handleCloseCashSession()
-                          } else {
-                            handleOpenCashSession()
-                          }
-                        }}
+                        onClick={handleChangeCashSession}
+                        disabled={cashSessionLoading || isUpdatingCashSession || isPending}
                       >
                         {cashSessionOpen ? 'Cerrar caja' : 'Abrir caja'}
                       </Button>
@@ -969,11 +1015,12 @@ export function AdminDashboard({
                             <Minus className="h-4 w-4" />
                           </Button>
                           <span className="min-w-24 text-right text-sm font-medium">{formatPrice(discount)}</span>
-                          <Button size="icon-sm" variant="outline" onClick={() => setDiscount((current) => current + 5000)}>
+                          <Button size="icon-sm" variant="outline" disabled={discount + 5000 > subtotal} onClick={() => setDiscount((current) => current + 5000)}>
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
+                      {invalidDiscount && <p role="alert" className="mt-2 text-sm text-destructive">El descuento debe estar entre cero y el subtotal.</p>}
                       <div className="mt-4 flex items-center justify-between border-t pt-4">
                         <span className="font-medium text-foreground">Total</span>
                         <span className="text-xl font-semibold text-foreground">{formatPrice(total)}</span>
@@ -1238,13 +1285,13 @@ export function AdminDashboard({
                     <Button
                       className="w-full"
                       onClick={handleConfirmSale}
-                      disabled={isPending || !cashSessionOpen || cartItems.length === 0}
+                      disabled={isPending || isUpdatingCashSession || !cashSessionOpen || invalidDiscount || cartItems.length === 0}
                     >
                       <CreditCard className="h-4 w-4" />
                       {isPending ? 'Guardando venta...' : 'Confirmar venta'}
                     </Button>
-                    {!cashSessionOpen && (
-                      <p className="text-center text-xs text-muted-foreground">
+                    {!cashSessionLoading && !cashSessionOpen && (
+                      <p role="status" className="text-center text-sm text-muted-foreground">
                         Debes abrir la caja antes de confirmar una venta.
                       </p>
                     )}

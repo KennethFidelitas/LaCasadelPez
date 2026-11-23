@@ -7,6 +7,8 @@ export type ApartadoStatus = 'activo' | 'pagado' | 'cancelado' | 'vencido'
 export type ApartadoItemType = 'product' | 'animal' | 'pecera_prediseno' | 'pecera_personalizada'
 export type AlertType = 'vencimiento_3dias' | 'vencimiento_1dia' | 'vencido' | 'cancelado'
 
+export const MAX_APARTADO_DAYS = 30
+
 export interface Apartado {
   id: string
   apartado_number: string

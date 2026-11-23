@@ -12,21 +12,14 @@ const footerLinks = {
     { name: 'Alimentos', href: '/tienda?categoria=alimentos' },
   ],
   servicios: [
-    { name: 'Acuarios a Medida', href: '/configurador' },
-    { name: 'Mantenimiento', href: '/servicios/mantenimiento' },
-    { name: 'Instalacion', href: '/servicios/instalacion' },
-    { name: 'Asesoria', href: '/servicios/asesoria' },
+    { name: 'Acuarios a Medida', href: '/armaTuPecera' },
+    { name: 'Asesoría', href: '/nosotros#asesoria' },
   ],
   empresa: [
     { name: 'Nosotros', href: '/nosotros' },
-    { name: 'Contacto', href: '/contacto' },
-    { name: 'Blog', href: '/blog' },
-    { name: 'Preguntas Frecuentes', href: '/faq' },
+    { name: 'Contacto', href: '/nosotros#contacto' },
   ],
   legal: [
-    { name: 'Terminos y Condiciones', href: '/terminos' },
-    { name: 'Politica de Privacidad', href: '/privacidad' },
-    { name: 'Politica de Envios', href: '/envios' },
     { name: 'Devoluciones', href: '/devoluciones' },
   ],
 }
@@ -40,7 +33,7 @@ export async function StoreFooter() {
       <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-6">
           {/* Brand and Contact */}
-          <div className="lg:col-span-2">
+          <div id="contacto" className="scroll-mt-28 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
                 <Fish className="h-6 w-6 text-primary-foreground" />
@@ -51,8 +44,8 @@ export async function StoreFooter() {
               </div>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
-              Tu tienda de confianza para todo lo relacionado con el mundo acuatico.
-              Expertos en acuarismo desde hace mas de 20 anos.
+              Tu tienda de confianza para todo lo relacionado con el mundo acuático.
+              Expertos en acuarismo desde hace más de 10 años.
             </p>
             <div className="mt-6 space-y-3 text-sm text-muted-foreground">
               <div className="flex items-start gap-2">

@@ -2,12 +2,19 @@
 // RF: Pagar pedido con transferencia/SINPE — crea la orden y sube el comprobante
 
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
-import type { CartItem } from '@/lib/types'
+import { PAYMENT_PROOF_EXTENSIONS, PAYMENT_PROOF_MAX_MB } from '@/lib/orders/payment-proof'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const checkoutItemsSchema = z.array(z.object({
+  id: z.string().uuid(),
+  type: z.enum(['product', 'animal']),
+  price: z.number().finite().nonnegative(),
+  quantity: z.number().int().positive().max(1000),
+})).min(1).max(100)
 
 function escapeHtml(value: string) {
   return value
@@ -30,41 +37,51 @@ export async function POST(request: Request) {
     const formData = await request.formData()
 
     // ── Extraer campos del FormData ──────────────────────────────────────
-    const itemsJson      = formData.get('items') as string
-    const paymentMethod  = formData.get('payment_method') as 'sinpe' | 'transferencia'
-    const transactionNum = formData.get('transaction_number') as string
-    const customerNotes  = formData.get('customer_notes') as string | null
-    const proofFile      = formData.get('proof_image') as File | null
+    const itemsJson = formData.get('items')
+    const paymentMethod = formData.get('payment_method')
+    const transaction = formData.get('transaction_number')
+    const transactionNum = typeof transaction === 'string' ? transaction.trim() : ''
+    const notes = formData.get('customer_notes')
+    const customerNotes = typeof notes === 'string' ? notes.trim().slice(0, 1000) : null
+    const proofFile = formData.get('proof_image')
 
     // ── Validaciones básicas ─────────────────────────────────────────────
-    if (!itemsJson || !paymentMethod || !transactionNum || !proofFile) {
+    if (typeof itemsJson !== 'string' || !itemsJson || !transactionNum || transactionNum.length > 100 || !(proofFile instanceof File)) {
       return NextResponse.json(
         { error: 'Faltan campos obligatorios: items, método de pago, número de transacción y comprobante.' },
         { status: 400 },
       )
     }
 
-    if (!['sinpe', 'transferencia'].includes(paymentMethod)) {
+    if (paymentMethod !== 'sinpe' && paymentMethod !== 'transferencia') {
       return NextResponse.json({ error: 'Método de pago inválido.' }, { status: 400 })
     }
 
-    if (!proofFile.type.startsWith('image/')) {
+    const extension = PAYMENT_PROOF_EXTENSIONS[proofFile.type]
+    if (!extension || proofFile.size === 0 || proofFile.size > PAYMENT_PROOF_MAX_MB * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'El comprobante debe ser una imagen (JPG, PNG, WEBP).' },
+        { error: `Adjuntá un comprobante JPG, PNG o WEBP de hasta ${PAYMENT_PROOF_MAX_MB} MB.` },
         { status: 400 },
       )
     }
 
-    const items: CartItem[] = JSON.parse(itemsJson)
-    if (!items.length) {
-      return NextResponse.json({ error: 'El carrito está vacío.' }, { status: 400 })
+    let rawItems: unknown
+    try {
+      rawItems = JSON.parse(itemsJson)
+    } catch {
+      return NextResponse.json({ error: 'No se pudo leer el carrito.' }, { status: 400 })
+    }
+    const parsed = checkoutItemsSchema.safeParse(rawItems)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Revisá los artículos y las cantidades del carrito.' }, { status: 400 })
     }
 
     // ── Obtener usuario autenticado (puede ser invitado) ─────────────────
     const supabaseUser = await createClient()
     const { data: { user } } = await supabaseUser.auth.getUser()
 
-    const customerEmail = ((formData.get('customer_email') as string | null) || user?.email || '').trim()
+    const email = formData.get('customer_email')
+    const customerEmail = (typeof email === 'string' && email.trim() ? email : user?.email ?? '').trim()
     if (!customerEmail || !EMAIL_PATTERN.test(customerEmail)) {
       return NextResponse.json(
         { error: 'Ingresá un correo electrónico válido para recibir la confirmación.' },
@@ -73,8 +90,39 @@ export async function POST(request: Request) {
     }
     const supabase = createAdminClient()
 
-    // ── Calcular totales ─────────────────────────────────────────────────
+    const catalog = await Promise.all((['product', 'animal'] as const).map(async (type) => {
+      const ids = parsed.data.filter((item) => item.type === type).map((item) => item.id)
+      if (!ids.length) return []
+      const { data, error } = await supabase.from(type === 'product' ? 'products' : 'animals')
+        .select('id, name, sku, price, inventory(quantity)')
+        .eq('is_active', true)
+        .in('id', ids)
+      if (error) throw error
+      return data.map((item) => ({
+        ...item,
+        type,
+        price: Number(item.price),
+        stock: (item.inventory ?? []).reduce((sum, row) => sum + Number(row.quantity ?? 0), 0),
+      }))
+    }))
+    const catalogById = new Map(catalog.flat().map((item) => [`${item.type}:${item.id}`, item]))
+    const quantities = new Map<string, number>()
+    const items = []
+    for (const requested of parsed.data) {
+      const key = `${requested.type}:${requested.id}`
+      const item = catalogById.get(key)
+      const quantity = (quantities.get(key) ?? 0) + requested.quantity
+      quantities.set(key, quantity)
+      if (!item || item.stock < quantity || item.price !== requested.price) {
+        return NextResponse.json({
+          error: 'Cambió el precio o la disponibilidad de un artículo. Volvé al catálogo para actualizar el carrito.',
+        }, { status: 409 })
+      }
+      items.push({ ...item, quantity: requested.quantity })
+    }
+
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const fileBuffer = await proofFile.arrayBuffer()
 
     // ── Crear la orden en estado pendiente (pago aún no validado) ────────
     const { data: order, error: orderError } = await supabase
@@ -101,6 +149,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No se pudo crear la orden.' }, { status: 500 })
     }
 
+    const orderId = order.id
+    async function removeIncompleteOrder() {
+      const { error } = await supabase.from('orders').delete().eq('id', orderId)
+      if (error) console.error('Error removing incomplete order:', error)
+    }
+
     // ── Insertar order_items ─────────────────────────────────────────────
     const orderItems = items.map(item => ({
       order_id: order.id,
@@ -116,12 +170,12 @@ export async function POST(request: Request) {
     const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
     if (itemsError) {
       console.error('Error inserting order_items:', itemsError)
+      await removeIncompleteOrder()
+      return NextResponse.json({ error: 'No se pudieron guardar los artículos del pedido. Intentá de nuevo.' }, { status: 500 })
     }
 
     // ── Subir imagen a Supabase Storage ──────────────────────────────────
-    const ext = proofFile.name.split('.').pop() ?? 'jpg'
-    const filePath = `${order.id}/${transactionNum.replace(/\s+/g, '_')}.${ext}`
-    const fileBuffer = await proofFile.arrayBuffer()
+    const filePath = `${order.id}/comprobante.${extension}`
 
     const { error: uploadError } = await supabase.storage
       .from('payment-proofs')
@@ -132,6 +186,7 @@ export async function POST(request: Request) {
 
     if (uploadError) {
       console.error('Error uploading proof:', uploadError)
+      await removeIncompleteOrder()
       return NextResponse.json(
         { error: 'No se pudo subir el comprobante. Intentá de nuevo.' },
         { status: 500 },
@@ -158,6 +213,10 @@ export async function POST(request: Request) {
 
     if (proofError) {
       console.error('Error inserting payment_proof:', proofError)
+      const { error: removeError } = await supabase.storage.from('payment-proofs').remove([filePath])
+      if (removeError) console.error('Error removing unregistered proof:', removeError)
+      await removeIncompleteOrder()
+      return NextResponse.json({ error: 'No se pudo registrar el comprobante de pago. Intentá de nuevo.' }, { status: 500 })
     }
 
     const itemRows = items.map(item => `

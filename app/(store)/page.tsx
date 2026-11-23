@@ -5,11 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { FeaturedProducts } from '@/components/store/featured-products'
 import { FeaturedAnimals } from '@/components/store/featured-animals'
 import { CategoryGrid } from '@/components/store/category-grid'
-import type { Product } from '@/lib/types'
-
-type ProductWithInventory = Product & {
-  inventory?: Array<{ quantity: number | null }>
-}
+import type { Animal, Product } from '@/lib/types'
+import { withInventoryStock } from '@/lib/catalog/inventory'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -17,27 +14,22 @@ export default async function HomePage() {
   // Fetch featured products
   const { data: products } = await supabase
     .from('products')
-    .select('*, category:categories(*), inventory(quantity)')
+    .select('*, category:categories(*), inventory(quantity, low_stock_threshold)')
     .eq('is_active', true)
     .eq('is_featured', true)
     .order('created_at', { ascending: false })
     .limit(8)
 
-  const productsWithStock = (products ?? []).map(product => {
-    const { inventory = [], ...productData } = product as ProductWithInventory
-    return {
-      ...productData,
-      stock_quantity: inventory.reduce((total, row) => total + Number(row.quantity ?? 0), 0),
-    }
-  })
+  const productsWithStock = (products ?? []).map((product) => withInventoryStock<Product>(product))
 
   // Fetch featured animals
   const { data: animals } = await supabase
     .from('animals')
-    .select('*')
+    .select('*, category:categories(*), inventory(quantity, low_stock_threshold)')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(8)
+  const animalsWithStock = (animals ?? []).map((animal) => withInventoryStock<Animal>(animal))
 
   // Fetch categories
   const { data: categories } = await supabase
@@ -59,7 +51,7 @@ export default async function HomePage() {
                 Tu Mundo Acuático Comienza Aquí
               </h1>
               <p className="mt-6 text-pretty text-lg text-muted-foreground">
-                Descubre nuestra amplia selección de peces tropicales, acuarios de alta calidad y todo lo que necesitas para crear el acuario de tus sueños. Expertos en acuarismo desde hace mas de 10 años.
+                Descubre nuestra amplia selección de peces tropicales, acuarios de alta calidad y todo lo que necesitas para crear el acuario de tus sueños. Expertos en acuarismo desde hace más de 10 años.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Button size="lg" asChild>
@@ -203,7 +195,7 @@ export default async function HomePage() {
               </Link>
             </Button>
           </div>
-          <FeaturedAnimals animals={animals || []} />
+          <FeaturedAnimals animals={animalsWithStock} />
         </div>
       </section>
 

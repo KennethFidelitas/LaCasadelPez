@@ -16,8 +16,11 @@ const posSaleItemSchema = z.object({
 
 const posSaleSchema = z.object({
   items: z.array(posSaleItemSchema).min(1),
-  discount: z.number().nonnegative(),
+  discount: z.number().finite().nonnegative('El descuento no puede ser negativo.'),
   paymentMethod: z.enum(['Efectivo', 'Tarjeta', 'Credito', 'Crédito', 'Mixto']),
+  cashReceived: z.number().finite().nonnegative('El efectivo no puede ser negativo.'),
+  cardAmount: z.number().finite().nonnegative('El monto de tarjeta no puede ser negativo.'),
+  creditAmount: z.number().finite().nonnegative('El monto de crédito no puede ser negativo.'),
 })
 
 const PAYMENT_METHOD_MAP = {
@@ -81,11 +84,11 @@ async function requirePosStaff(supabase: PosSupabaseClient) {
   return user
 }
 
-async function getOrCreateOpenSession(supabase: PosSupabaseClient, processedBy: string) {
+async function findOpenSession(supabase: PosSupabaseClient, processedBy: string) {
 
   const { data: existingSession, error: existingSessionError } = await supabase
     .from('pos_sessions')
-    .select('id, total_sales, total_transactions')
+    .select('id, opening_cash, total_sales, total_transactions')
     .eq('opened_by', processedBy)
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
@@ -96,26 +99,47 @@ async function getOrCreateOpenSession(supabase: PosSupabaseClient, processedBy: 
     throw new Error(existingSessionError.message)
   }
 
-  if (existingSession) {
-    return existingSession
-  }
+  return existingSession
+}
 
-  const { data: newSession, error: newSessionError } = await supabase
-    .from('pos_sessions')
-    .insert({
-      opened_by: processedBy,
-      opening_cash: 0,
+export async function getPosCashSession() {
+  const supabase = await createClient()
+  const user = await requirePosStaff(supabase)
+  const session = await findOpenSession(supabase, user.id)
+  return session ? { openingCash: Number(session.opening_cash) } : null
+}
+
+export async function setPosCashSession(input: unknown) {
+  const payload = z.discriminatedUnion('action', [
+    z.object({ action: z.literal('open'), amount: z.number().finite().nonnegative() }),
+    z.object({ action: z.literal('close'), amount: z.number().finite().nonnegative(), notes: z.string().trim().max(1000) }),
+  ]).parse(input)
+  const supabase = await createClient()
+  const user = await requirePosStaff(supabase)
+  const session = await findOpenSession(supabase, user.id)
+
+  if (payload.action === 'open') {
+    if (session) return { openingCash: Number(session.opening_cash) }
+    const { error } = await supabase.from('pos_sessions').insert({
+      opened_by: user.id,
+      opening_cash: payload.amount,
       status: 'open',
-      notes: 'Sesión POS creada automáticamente al registrar una venta.',
     })
-    .select('id, total_sales, total_transactions')
-    .single()
-
-  if (newSessionError) {
-    throw new Error(newSessionError.message)
+    if (error) throw new Error(error.message)
+    return { openingCash: payload.amount }
   }
 
-  return newSession
+  if (session) {
+    const { error } = await supabase.from('pos_sessions').update({
+      status: 'closed',
+      closed_by: user.id,
+      closed_at: new Date().toISOString(),
+      closing_cash: payload.amount,
+      notes: payload.notes || null,
+    }).eq('id', session.id).eq('status', 'open')
+    if (error) throw new Error(error.message)
+  }
+  return null
 }
 
 export async function updateOrderStatus(input: unknown) {
@@ -153,15 +177,29 @@ export async function updateOrderStatus(input: unknown) {
 }
 
 export async function createPosSale(input: unknown) {
-  const payload = posSaleSchema.parse(input)
+  const parsed = posSaleSchema.safeParse(input)
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+  const payload = parsed.data
   const supabase = await createClient()
 
   const user = await requirePosStaff(supabase)
 
   const itemIds = payload.items.map((item) => item.id)
-  const subtotal = payload.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const discount = Math.min(payload.discount, subtotal)
-  const total = Math.max(0, subtotal - discount)
+  if (new Set(itemIds).size !== itemIds.length) throw new Error('El carrito contiene productos repetidos.')
+  const subtotal = Math.round(payload.items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100
+  const discount = payload.discount
+  if (discount > subtotal) throw new Error('El descuento no puede superar el subtotal.')
+  const total = Math.round((subtotal - discount) * 100) / 100
+  const method = PAYMENT_METHOD_MAP[payload.paymentMethod]
+  const cash = method === 'efectivo' || method === 'mixto' ? payload.cashReceived : 0
+  const card = method === 'tarjeta' || method === 'mixto' ? payload.cardAmount : 0
+  const credit = method === 'credito' ? payload.creditAmount : 0
+  if (Math.round((cash + card + credit) * 100) < Math.round(total * 100)) {
+    throw new Error('El monto recibido no cubre el total de la venta.')
+  }
+  if (card + credit > total) throw new Error('El monto de tarjeta o crédito no puede superar el total.')
+  const session = await findOpenSession(supabase, user.id)
+  if (!session) throw new Error('Debés abrir la caja antes de confirmar una venta.')
 
   const { data: inventories, error: inventoryError } = await supabase
     .from('inventory')
@@ -196,8 +234,6 @@ export async function createPosSale(input: unknown) {
       throw new Error(`Stock insuficiente para ${item.name}.`)
     }
   }
-
-  const session = await getOrCreateOpenSession(supabase, user.id)
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -249,7 +285,11 @@ export async function createPosSale(input: unknown) {
       tax: 0,
       credits_applied: 0,
       total,
-      payment_method: PAYMENT_METHOD_MAP[payload.paymentMethod],
+      payment_method: method,
+      cash_received: cash || null,
+      cash_change: cash ? Math.round((cash + card - total) * 100) / 100 : null,
+      card_amount: card || null,
+      credit_amount: credit || null,
       items: payload.items.map((item) => ({
         product_id: item.id,
         name: item.name,
@@ -313,5 +353,9 @@ export async function createPosSale(input: unknown) {
     transactionId: transaction.id,
     transactionNumber: transaction.transaction_number,
     total,
+    stockByProduct: Object.fromEntries(payload.items.map((item) => [
+      item.id,
+      (inventoryByProductId.get(item.id) ?? []).reduce((sum, row) => sum + row.quantity, 0) - item.quantity,
+    ])),
   }
 }

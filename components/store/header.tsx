@@ -6,6 +6,9 @@ import { Fish, ShoppingCart, Menu, X, Search, User } from 'lucide-react'
 import { Button } from '@/components/ui/actions/button'
 import { useCart } from '@/lib/cart-context'
 import { SocialLinks } from '@/components/store/social-links'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/overlays/dialog'
+import { Input } from '@/components/ui/forms/input'
+import { useRouter } from 'next/navigation'
 
 const navigation = [
   { name: 'Inicio', href: '/' },
@@ -31,9 +34,11 @@ type StoreHeaderProps = {
 
 export function StoreHeader({ showAdminLink = false, isLoggedIn = false, socialUrls }: StoreHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const router = useRouter()
   const { totalItems, openCart } = useCart()
-  const navigationItems = showAdminLink
-    ? [...navigation, { name: 'Administracion', href: '/dashboard' }]
+  const navigationItems = showAdminLink || !isLoggedIn
+    ? [...navigation, { name: 'Administración', href: '/dashboard' }]
     : navigation
 
   return (
@@ -74,10 +79,29 @@ export function StoreHeader({ showAdminLink = false, isLoggedIn = false, socialU
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="hidden sm:flex">
-            <Search className="h-5 w-5" />
-            <span className="sr-only">Buscar</span>
-          </Button>
+          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Buscar">
+                <Search className="h-5 w-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Buscar en el catálogo</DialogTitle>
+                <DialogDescription>Buscá peces y productos por nombre.</DialogDescription>
+              </DialogHeader>
+              <form className="flex gap-2" onSubmit={(event) => {
+                event.preventDefault()
+                const query = String(new FormData(event.currentTarget).get('q') ?? '').trim()
+                if (!query) return
+                setSearchOpen(false)
+                router.push(`/buscar?${new URLSearchParams({ q: query })}`)
+              }}>
+                <Input name="q" type="search" aria-label="Nombre del pez o producto" required maxLength={100} />
+                <Button type="submit">Buscar</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
           <Button variant="ghost" size="icon" asChild>
             <Link href={isLoggedIn ? '/cuenta' : '/auth/login'}>
               <User className="h-5 w-5" />
@@ -105,7 +129,7 @@ export function StoreHeader({ showAdminLink = false, isLoggedIn = false, socialU
             onClick={() => setMobileMenuOpen(true)}
           >
             <Menu className="h-5 w-5" />
-            <span className="sr-only">Menu</span>
+            <span className="sr-only">Menú</span>
           </Button>
         </div>
       </nav>

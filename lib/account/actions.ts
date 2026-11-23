@@ -2,12 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { phoneSchema } from '@/lib/phone-validation'
 import { createClient } from '@/lib/supabase/server'
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'El nombre es obligatorio.').max(100),
   lastName: z.string().trim().max(100).optional().default(''),
-  phone: z.string().trim().max(50).optional().default(''),
+  phone: phoneSchema.optional().default(''),
 })
 
 export type UpdateAccountProfileResult =
@@ -56,7 +57,7 @@ export async function updateAccountProfile(input: unknown): Promise<UpdateAccoun
       first_name: payload.firstName,
       last_name: payload.lastName || null,
       phone: payload.phone || null,
-      role: currentProfile?.role ?? user.user_metadata?.role ?? 'customer',
+      role: currentProfile?.role ?? 'customer',
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'id' },

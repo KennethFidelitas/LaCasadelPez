@@ -20,7 +20,7 @@ export const CUSTOM_GLASS_OPTIONS: Array<{
   {
     id: 'claro-6mm',
     label: 'Vidrio claro 6 mm',
-    description: 'Para peceras pequenas y medianas.',
+    description: 'Para peceras pequeñas y medianas.',
     pricePerSquareMeter: 38000,
   },
   {
@@ -125,9 +125,9 @@ export function CustomPeceraCard({
       {selected && (
         <div className="mt-3 border-t border-border pt-3">
           <div className="grid grid-cols-3 gap-2">
-            <DimensionInput label="Largo" value={currentDimensions.largo} onChange={value => onChange('largo', value)} />
-            <DimensionInput label="Ancho" value={currentDimensions.ancho} onChange={value => onChange('ancho', value)} />
-            <DimensionInput label="Alto" value={currentDimensions.alto} onChange={value => onChange('alto', value)} />
+            <DimensionInput label="Ancho (cm)" value={currentDimensions.largo} onChange={value => onChange('largo', value)} />
+            <DimensionInput label="Fondo (cm)" value={currentDimensions.ancho} onChange={value => onChange('ancho', value)} />
+            <DimensionInput label="Alto (cm)" value={currentDimensions.alto} onChange={value => onChange('alto', value)} />
           </div>
           <label className="mt-3 grid gap-1 text-xs text-muted-foreground">
             Vidrio
@@ -157,7 +157,7 @@ function DimensionInput({ label, value, onChange }: { label: string; value: numb
       <input
         type="number"
         min={1}
-        value={value}
+        value={value || ''}
         onChange={event => onChange(Number(event.target.value))}
         className="h-9 rounded-md border border-border bg-background px-2 font-mono text-sm text-foreground outline-none transition-colors focus:border-teal"
       />

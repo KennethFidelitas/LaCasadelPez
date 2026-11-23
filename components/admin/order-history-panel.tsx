@@ -9,6 +9,7 @@ import type { PosSaleRecord, PosSalesSummary } from '@/lib/pos/types'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { Badge } from '@/components/ui/display/badge'
 import { Button } from '@/components/ui/actions/button'
+import { Input } from '@/components/ui/forms/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/display/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/display/table'
 
@@ -39,6 +40,13 @@ export function OrderHistoryPanel({
 }: OrderHistoryPanelProps) {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  const [search, setSearch] = useState('')
+  const query = search.trim().replace(/^(#|tx\s+)/i, '').toLowerCase()
+  const matchingOrders = orders.filter((order) =>
+    [order.orderNumber, order.transactionNumber].some((number) =>
+      number?.toLowerCase().includes(query),
+    ),
+  )
 
   function handleOrderStatusChange(order: PosSaleRecord, status: OrderStatusValue) {
     if (order.rawStatus === status) return
@@ -92,6 +100,14 @@ export function OrderHistoryPanel({
           <CardDescription>Transacciones reales registradas en el sistema por canal y fecha.</CardDescription>
         </CardHeader>
         <CardContent>
+          <Input
+            type="search"
+            aria-label="Buscar por número de pedido o transacción"
+            placeholder="Buscar por número de pedido o transacción"
+            className="mb-4"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
           {salesError && (
             <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
               No se pudo cargar el historial de ventas. Detalle: {salesError}
@@ -100,6 +116,10 @@ export function OrderHistoryPanel({
           {orders.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
               Aún no hay ventas registradas para mostrar.
+            </div>
+          ) : matchingOrders.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+              No hay ventas que coincidan con la búsqueda.
             </div>
           ) : (
             <Table>
@@ -116,7 +136,7 @@ export function OrderHistoryPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders.map((order) => (
+                {matchingOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>
                       <div className="font-medium">{order.orderNumber}</div>

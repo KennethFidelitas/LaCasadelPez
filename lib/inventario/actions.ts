@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { requireStaffUser } from '@/lib/auth/session'
 import {
+  productoSchema,
+  registroMuerteSchema,
   type EntradaItemValues,
   type RegistroMuerteValues,
   type SalidaProductoValues,
@@ -84,14 +87,14 @@ export async function registrarEntradaInventario(input: RegistrarEntradaInventar
 // ─── RF-INV-006: Registrar muerte de animales ─────────────────────────────────
 
 export async function registrarMuerteAnimal(
-  data: RegistroMuerteValues,
+  input: RegistroMuerteValues,
 ): Promise<{ success: boolean; error?: string }> {
+  const { user } = await requireStaffUser('/inventario/registro-muerte')
+  const parsed = registroMuerteSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message }
+  const data = parsed.data
   try {
     const supabase = createAdminClient()
-
-    // 1. Obtener usuario autenticado
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
 
     // 2. Obtener stock actual del animal
     const { data: inventario, error: errorInventario } = await supabase
@@ -113,32 +116,42 @@ export async function registrarMuerteAnimal(
     }
 
     // 4. Registrar en animal_mortality
-    const { error: errorMuerte } = await supabase.from('animal_mortality').insert({
+    const { data: record, error: errorMuerte } = await supabase.from('animal_mortality').insert({
       animal_id: data.animal_id,
       quantity: data.quantity,
       reason: data.reason,
       notes: data.notes ?? null,
-      recorded_by: user?.id ?? null,
+      recorded_by: user.id,
       recorded_at: data.recorded_at,
-    })
+    }).select('id').single()
 
     if (errorMuerte) {
       return { success: false, error: `Error al registrar la baja: ${errorMuerte.message}` }
     }
 
     // 5. Restar la cantidad del stock en inventory
-    const { error: errorUpdate } = await supabase
+    const { data: updated, error: errorUpdate } = await supabase
       .from('inventory')
       .update({ quantity: inventario.quantity - data.quantity })
       .eq('id', inventario.id)
+      .eq('quantity', inventario.quantity)
+      .select('id')
+      .maybeSingle()
 
-    if (errorUpdate) {
-      return { success: false, error: `Error al actualizar el stock: ${errorUpdate.message}` }
+    if (errorUpdate || !updated) {
+      const { error: rollbackError } = await supabase.from('animal_mortality').delete().eq('id', record.id)
+      if (rollbackError) {
+        console.error('Error al revertir el registro de mortalidad:', rollbackError)
+        return { success: false, error: 'No se pudo actualizar el stock. Revisá el historial antes de volver a registrar la baja.' }
+      }
+      return { success: false, error: errorUpdate?.message ?? 'El stock cambió. Actualizá la página antes de volver a intentar.' }
     }
 
     // 6. Revalidar rutas afectadas
     revalidatePath('/inventario/consultar-animales')
     revalidatePath('/inventario/registro-muerte')
+    revalidatePath('/mortalidad')
+    revalidatePath('/reporte-mortalidad')
 
     return { success: true }
   } catch (err) {
@@ -257,9 +270,14 @@ function productImagePathFromUrl(url: string) {
 }
 
 export async function crearProducto(
-  input: ProductoValues,
+  values: ProductoValues,
   images: File[],
 ): Promise<{ success: boolean; error?: string; productId?: string }> {
+  await requireStaffUser('/inventario/agregar-producto')
+  const parsed = productoSchema.safeParse(values)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message }
+  const input = parsed.data
+
   try {
     const supabase = createAdminClient()
 
