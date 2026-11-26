@@ -124,7 +124,7 @@ export function formatPhRange(min: number | null, max: number | null): string {
  */
 export function translateCareLevel(level: 'facil' | 'moderado' | 'avanzado'): string {
   const translations = {
-    facil: 'Facil',
+    facil: 'Fácil',
     moderado: 'Moderado',
     avanzado: 'Avanzado',
   }

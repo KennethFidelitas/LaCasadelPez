@@ -9,8 +9,11 @@
 // constantes del módulo viven en ./types.ts.
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { APARTADO_STATUS_LABELS } from './types'
+import { requireStaffUser } from '@/lib/auth/session'
+import { phoneSchema } from '@/lib/phone-validation'
+import { APARTADO_STATUS_LABELS, MAX_APARTADO_DAYS } from './types'
 import type {
   Apartado, ApartadoAlert, ApartadoStatus, CreateApartadoInput, ApartadoPaymentMethod,
 } from './types'
@@ -18,28 +21,47 @@ import type {
 // ─── Crear apartado ───────────────────────────────────────────────────────────
 
 export async function crearApartado(input: CreateApartadoInput): Promise<Apartado> {
+  const parsed = z.object({
+    customer_name: z.string().trim().max(200).regex(/^[\p{L}\p{M} .’'-]+$/u, 'Ingresá un nombre de cliente válido.').refine((name) => /\p{L}/u.test(name), 'Ingresá el nombre del cliente.'),
+    customer_phone: phoneSchema.refine(Boolean, 'Ingresá el teléfono del cliente.'),
+    customer_email: z.string().trim().email('Ingresá un correo electrónico válido.').optional(),
+    expires_days: z.number().int().min(1).max(MAX_APARTADO_DAYS).default(7),
+    total_price: z.number().finite().positive('El total debe ser mayor a cero.'),
+    deposit_amount: z.number().finite().positive('El anticipo debe ser mayor a cero.'),
+  }).safeParse(input)
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(issue.path[0] === 'expires_days'
+      ? `La vigencia debe ser de 1 a ${MAX_APARTADO_DAYS} días enteros.`
+      : issue.message)
+  }
+  const values = parsed.data
+  if (values.deposit_amount > values.total_price) throw new Error('El anticipo no puede superar el total.')
+
+  const { user } = await requireStaffUser('/dashboard')
   const supabase = createAdminClient()
 
   const expires_at = new Date()
-  expires_at.setDate(expires_at.getDate() + (input.expires_days ?? 7))
+  expires_at.setDate(expires_at.getDate() + values.expires_days)
 
   const { data, error } = await supabase
     .from('apartados')
     .insert([{
       user_id: input.user_id ?? null,
-      customer_name: input.customer_name,
-      customer_email: input.customer_email ?? null,
-      customer_phone: input.customer_phone,
+      customer_name: values.customer_name,
+      customer_email: values.customer_email ?? null,
+      customer_phone: values.customer_phone,
       item_type: input.item_type,
       product_id: input.product_id ?? null,
       animal_id: input.animal_id ?? null,
       quantity: input.quantity ?? 1,
       aquarium_config: input.aquarium_config ?? {},
-      total_price: input.total_price,
-      deposit_amount: input.deposit_amount,
+      total_price: values.total_price,
+      deposit_amount: values.deposit_amount,
       status: 'activo',
       expires_at: expires_at.toISOString(),
-      created_by: input.created_by ?? null,
+      created_by: user.id,
       notes: input.notes ?? null,
     }])
     .select()

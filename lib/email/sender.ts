@@ -15,7 +15,7 @@ const SITE_URL = getSiteUrl()
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY
   if (!key) {
-    console.warn('[Email] RESEND_API_KEY no configurada. Los correos solo se registrarán en consola.')
+    console.warn('[Email] RESEND_API_KEY no configurada.')
     return null
   }
   return new Resend(key)
@@ -40,8 +40,7 @@ async function sendEmail(params: {
   const resend = getResend()
 
   if (!resend) {
-    console.log('[Email] (sin envío real):', { to: params.to, subject: params.subject })
-    return { ok: true }
+    return { ok: false, error: 'El envío de correo no está configurado.' }
   }
 
   try {

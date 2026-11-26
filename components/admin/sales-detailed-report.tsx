@@ -31,6 +31,7 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
   const [paymentMethod, setPaymentMethod] = useState<FilterValue | string>('all')
   const [query, setQuery] = useState('')
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+  const invalidRange = Boolean(startDate && endDate && startDate > endDate)
 
   const paymentMethods = useMemo(
     () => Array.from(new Set(sales.map((sale) => sale.paymentMethod).filter(Boolean))).sort(),
@@ -38,8 +39,9 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
   )
 
   const filteredSales = useMemo(() => {
+    if (invalidRange) return []
     const start = startDate ? new Date(`${startDate}T00:00:00`) : null
-    const end = endDate ? new Date(`${endDate}T23:59:59`) : null
+    const end = endDate ? new Date(`${endDate}T23:59:59.999`) : null
     const normalizedQuery = query.trim().toLowerCase()
 
     return sales.filter((sale) => {
@@ -61,7 +63,7 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
 
       return searchable.includes(normalizedQuery)
     })
-  }, [channel, endDate, paymentMethod, paymentStatus, query, sales, startDate, status])
+  }, [channel, endDate, invalidRange, paymentMethod, paymentStatus, query, sales, startDate, status])
 
   const totals = useMemo(() => {
     const paidSales = filteredSales.filter(
@@ -293,11 +295,16 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <FilterField label="Desde">
-        <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        <Input type="date" value={startDate} aria-invalid={invalidRange} onChange={(event) => setStartDate(event.target.value)} />
       </FilterField>
       <FilterField label="Hasta">
-        <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+        <Input type="date" value={endDate} aria-invalid={invalidRange} onChange={(event) => setEndDate(event.target.value)} />
       </FilterField>
+      {invalidRange && (
+        <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">
+          La fecha inicial debe ser anterior o igual a la fecha final.
+        </p>
+      )}
       <FilterField label="Canal">
         <Select value={channel} onValueChange={(value) => setChannel(value as ChannelFilter)}>
           <SelectTrigger className="w-full">
@@ -368,7 +375,7 @@ export function SalesDetailedReport({ sales }: SalesDetailedReportProps) {
       </FilterField>
 
       <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4 xl:col-span-4">
-        <Button type="button" className="w-full" onClick={() => setGeneratedAt(new Date().toISOString())}>
+        <Button type="button" className="w-full" disabled={invalidRange} onClick={() => setGeneratedAt(new Date().toISOString())}>
           <FileText className="mr-2 h-4 w-4" />
           Generar
         </Button>

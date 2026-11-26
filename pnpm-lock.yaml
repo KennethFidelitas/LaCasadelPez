@@ -192,6 +192,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      '@types/three':
+        specifier: 0.185.1
+        version: 0.185.1
       postcss:
         specifier: ^8.5
         version: 8.5.6

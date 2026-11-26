@@ -1,8 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { verifyPasswordResetToken } from '@/lib/auth/password-reset-token'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1, 'El enlace no es válido.'),
@@ -30,33 +29,24 @@ export async function resetPasswordWithToken(input: unknown): Promise<ResetPassw
     return { ok: false, message: 'Las contraseñas no coinciden.' }
   }
 
-  const payload = verifyPasswordResetToken(token)
-
-  if (!payload) {
+  const supabase = await createClient()
+  const { data, error: verificationError } = await supabase.auth.verifyOtp({
+    type: 'recovery',
+    token_hash: token,
+  })
+  if (verificationError || !data.session) {
     return {
       ok: false,
-      message: 'El enlace para cambiar la contraseña expiró o no es válido. Solicitá uno nuevo.',
+      message: 'El enlace expiró, ya fue usado o no es válido. Solicitá uno nuevo.',
     }
   }
 
-  const supabase = createAdminClient()
-  const { error } = await supabase.auth.admin.updateUserById(payload.sub, {
-    password,
-  })
+  const { error } = await supabase.auth.updateUser({ password })
+  await supabase.auth.signOut({ scope: 'local' })
 
   if (error) {
-    console.error('[Password reset] No se pudo actualizar contraseña:', {
-      userId: payload.sub,
-      email: payload.email,
-      error: error.message,
-    })
-    return { ok: false, message: error.message }
+    return { ok: false, message: `${error.message} Solicitá un enlace nuevo para volver a intentarlo.` }
   }
-
-  console.info('[Password reset] Contraseña actualizada:', {
-    userId: payload.sub,
-    email: payload.email,
-  })
 
   return { ok: true, message: 'Contraseña actualizada correctamente. Ya podés iniciar sesión.' }
 }

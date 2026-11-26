@@ -27,8 +27,11 @@ interface PosTransaction {
   items: Array<{
     name: string
     quantity: number
-    price: number
-    subtotal: number
+    price?: number
+    subtotal?: number
+    unit_price?: number
+    total?: number
+    total_price?: number
   }>
   status: string
   processed_by: string
@@ -195,7 +198,7 @@ export default function ImprimirVentaPage() {
       </div>
 
       {/* Contenido de la factura */}
-      <div className="mx-auto max-w-2xl bg-white p-8 print:p-0">
+      <div id="comprobante-venta" className="mx-auto max-w-2xl bg-white p-8 print:p-0">
         {/* Encabezado */}
         <div className="mb-8 border-b-2 pb-6 text-center">
           <h1 className="text-2xl font-bold">LA CASA DEL PEZ</h1>
@@ -272,10 +275,10 @@ export default function ImprimirVentaPage() {
                     <td className="py-2">{item.name || "-"}</td>
                     <td className="py-2 text-center">{item.quantity || 0}</td>
                     <td className="py-2 text-right">
-                      {formatMoney(item.price)}
+                      {formatMoney(item.unit_price ?? item.price ?? 0)}
                     </td>
                     <td className="py-2 text-right">
-                      {formatMoney(item.subtotal)}
+                      {formatMoney(item.total ?? item.total_price ?? item.subtotal ?? 0)}
                     </td>
                   </tr>
                 ))
@@ -379,6 +382,11 @@ export default function ImprimirVentaPage() {
         @media print {
           body {
             background: white;
+          }
+
+          body:has(#comprobante-venta) header,
+          body:has(#comprobante-venta) footer {
+            display: none !important;
           }
 
           .print\\:hidden {

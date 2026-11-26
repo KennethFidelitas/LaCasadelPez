@@ -4,27 +4,7 @@ import { ProductGrid } from '@/components/store/product-grid'
 import { ProductFilters } from '@/components/store/product-filters'
 import { Skeleton } from '@/components/ui/display/skeleton'
 import type { Product } from '@/lib/types'
-
-type ProductInventoryRow = {
-  quantity: number | null
-  low_stock_threshold: number | null
-}
-
-type ProductWithInventory = Product & {
-  inventory?: ProductInventoryRow[]
-}
-
-function addInventoryStock(product: ProductWithInventory): Product {
-  const { inventory = [], ...productData } = product
-
-  return {
-    ...productData,
-    stock_quantity: inventory.reduce((total, row) => total + Number(row.quantity ?? 0), 0),
-    low_stock_threshold: inventory.length
-      ? Math.max(...inventory.map(row => Number(row.low_stock_threshold ?? 0)))
-      : Number(product.low_stock_threshold ?? 0),
-  }
-}
+import { withInventoryStock } from '@/lib/catalog/inventory'
 
 interface TiendaPageProps {
   searchParams: Promise<{
@@ -104,7 +84,7 @@ export default async function TiendaPage({ searchParams }: TiendaPageProps) {
 
   const totalPages = Math.ceil((count || 0) / limit)
   const productsWithStock = (products ?? []).map(product =>
-    addInventoryStock(product as ProductWithInventory),
+    withInventoryStock<Product>(product),
   )
 
   return (

@@ -2,29 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PecesExplorer } from '@/components/peces/PecesExplorer'
 import { PRECIO_MIN, PRECIO_MAX } from '@/components/peces/data'
 import type { Animal } from '@/lib/types'
-
-type AnimalInventoryRow = {
-  quantity: number | null
-  low_stock_threshold: number | null
-}
-
-type AnimalWithInventory = Animal & {
-  inventory?: AnimalInventoryRow[]
-}
-
-// Mismo patrón que addInventoryStock en app/(store)/tienda/page.tsx: stock_quantity
-// y low_stock_threshold no son columnas de `animals`, se calculan del join a inventory.
-function addInventoryStock(animal: AnimalWithInventory): Animal {
-  const { inventory = [], ...animalData } = animal
-
-  return {
-    ...animalData,
-    stock_quantity: inventory.reduce((total, row) => total + Number(row.quantity ?? 0), 0),
-    low_stock_threshold: inventory.length
-      ? Math.max(...inventory.map((row) => Number(row.low_stock_threshold ?? 0)))
-      : 0,
-  }
-}
+import { withInventoryStock } from '@/lib/catalog/inventory'
 
 export default async function PecesPage() {
   const supabase = await createClient()
@@ -50,7 +28,7 @@ export default async function PecesPage() {
     console.error('[PecesPage] animals error:', animalsError)
   }
 
-  const animalesConStock = ((animals ?? []) as AnimalWithInventory[]).map(addInventoryStock)
+  const animalesConStock = (animals ?? []).map((animal) => withInventoryStock<Animal>(animal))
 
   const precios = animalesConStock.map((a) => a.price)
   const precioMin = precios.length ? Math.min(...precios) : PRECIO_MIN

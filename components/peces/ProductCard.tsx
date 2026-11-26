@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
-import { Search, Heart, ShoppingCart, Fish } from 'lucide-react'
+import Link from 'next/link'
+import { Search, Heart, ShoppingCart } from 'lucide-react'
+import { CatalogImage } from '@/components/store/catalog-image'
 import { formatColones } from './data'
 import { useCart } from '@/lib/cart-context'
 import type { Animal } from '@/lib/types'
@@ -54,31 +55,23 @@ export function ProductCard({ animal }: ProductCardProps) {
     >
       {/* ── Imagen ─────────────────────────────────────────────────────── */}
       <div className="relative aspect-square overflow-hidden bg-secondary rounded-lg">
-        {imagen ? (
-          <Image
-            src={imagen}
-            alt={animal.name}
-            fill
-            className="object-cover transition-transform group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Fish className="h-12 w-12 text-foreground/20" />
-          </div>
-        )}
+        <Link href={`/peces/${animal.slug}`} className="absolute inset-0" aria-label={`Ver ${animal.name}`}>
+          <CatalogImage src={imagen} alt={animal.name} sizes="(min-width: 1024px) 25vw, 50vw" />
+        </Link>
 
         {/* Íconos de hover */}
         <div
-          className={`absolute inset-0 flex items-center justify-center gap-3 bg-foreground/10 transition-opacity duration-200 ${
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center gap-3 bg-foreground/10 transition-opacity duration-200 focus-within:opacity-100 ${
             hovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <button
-            aria-label="Ver detalle"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background"
+          <Link
+            href={`/peces/${animal.slug}`}
+            aria-label={`Ver detalle de ${animal.name}`}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background"
           >
             <Search className="h-4 w-4" />
-          </button>
+          </Link>
           <button
             aria-label="Añadir a favoritos"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background"
@@ -108,7 +101,7 @@ export function ProductCard({ animal }: ProductCardProps) {
       {/* ── Contenido ──────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col p-3">
         <h3 className="line-clamp-2 text-sm font-medium text-foreground leading-snug">
-          {animal.name}
+          <Link href={`/peces/${animal.slug}`} className="hover:text-primary">{animal.name}</Link>
         </h3>
         {animal.scientific_name && (
           <p className="text-xs italic text-foreground/50 line-clamp-1">

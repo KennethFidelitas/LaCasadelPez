@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { ShoppingCart, Fish, Droplets, Thermometer } from 'lucide-react'
+import { ShoppingCart, Fish, Thermometer } from 'lucide-react'
 import { Button } from '@/components/ui/actions/button'
 import { useCart } from '@/lib/cart-context'
-import { formatPrice, translateCareLevel, translateWaterType } from '@/lib/format'
+import { formatPrice, translateCareLevel } from '@/lib/format'
 import type { Animal } from '@/lib/types'
+import { CatalogImage } from './catalog-image'
 
 interface FeaturedAnimalsProps {
   animals: Animal[]
@@ -18,14 +18,6 @@ const careLevelColors = {
   avanzado: 'bg-red-100 text-red-700',
 }
 
-function getAnimalDisplayName(animal: Animal) {
-  return animal.common_name?.trim() || animal.scientific_name?.trim() || 'Pez tropical'
-}
-
-function getAnimalImageAlt(animal: Animal) {
-  return `Foto de ${getAnimalDisplayName(animal)}`
-}
-
 export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
   const { addItem, openCart } = useCart()
 
@@ -33,7 +25,8 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
     addItem({
       id: animal.id,
       type: 'animal',
-      name: getAnimalDisplayName(animal),
+      name: animal.name,
+      sku: animal.sku,
       price: animal.price,
       image: animal.images?.[0],
       stock: animal.stock_quantity,
@@ -57,28 +50,19 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
           className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/50 hover:shadow-lg"
         >
           <Link href={`/peces/${animal.slug}`} className="relative aspect-square bg-muted">
-            {animal.images?.[0] ? (
-              <Image
-                src={animal.images[0]}
-                alt={getAnimalImageAlt(animal)}
-                fill
-                className="object-cover transition-transform group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <Fish className="h-12 w-12 text-muted-foreground/50" />
-              </div>
-            )}
+            <CatalogImage src={animal.images?.[0]} alt={animal.name} sizes="(min-width: 1024px) 25vw, 50vw" />
             <div className="absolute left-3 top-3 flex flex-col gap-1">
-              <span className={`rounded-full px-2 py-1 text-xs font-medium ${careLevelColors[animal.care_level]}`}>
-                {translateCareLevel(animal.care_level)}
-              </span>
+              {animal.care_level && (
+                <span className={`rounded-full px-2 py-1 text-xs font-medium ${careLevelColors[animal.care_level]}`}>
+                  {translateCareLevel(animal.care_level)}
+                </span>
+              )}
             </div>
           </Link>
           <div className="flex flex-1 flex-col p-4">
             <Link href={`/peces/${animal.slug}`}>
               <h3 className="font-medium text-foreground line-clamp-1 group-hover:text-primary">
-                {getAnimalDisplayName(animal)}
+                {animal.name}
               </h3>
             </Link>
             {animal.scientific_name && (
@@ -87,10 +71,6 @@ export function FeaturedAnimals({ animals }: FeaturedAnimalsProps) {
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Droplets className="h-3 w-3" />
-                {translateWaterType(animal.water_type)}
-              </span>
               {animal.max_size && (
                 <span className="flex items-center gap-1">
                   <Fish className="h-3 w-3" />

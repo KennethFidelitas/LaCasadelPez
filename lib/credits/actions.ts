@@ -8,9 +8,9 @@ import type { CreditCustomerOption, CreditItem, CreditManagementData, CreditStat
 const creditSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   customerId: z.string().uuid('Seleccioná un cliente válido.'),
-  amount: z.coerce.number().positive('El monto del crédito debe ser mayor a 0.'),
-  paid: z.coerce.number().min(0, 'El monto abonado no puede ser negativo.').default(0),
-  dueDate: z.string().optional().nullable(),
+  amount: z.coerce.number().finite().positive('El monto del crédito debe ser mayor a 0.'),
+  paid: z.coerce.number().finite().min(0, 'El monto abonado no puede ser negativo.').default(0),
+  dueDate: z.string().date('Ingresá una fecha de vencimiento válida.').optional().nullable(),
   notes: z.string().trim().optional().default(''),
 })
 
@@ -39,9 +39,13 @@ function profileLabel(profile?: ProfileRow | null) {
   return fullName || profile.email || 'Cliente sin nombre'
 }
 
+function todayInCostaRica() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Costa_Rica' }).format(new Date())
+}
+
 function mapStatus(balance: number, dueDate: string): CreditStatus {
   if (balance <= 0) return 'Pagado'
-  if (dueDate && new Date(dueDate) < new Date(new Date().toDateString())) return 'Vencido'
+  if (dueDate && dueDate < todayInCostaRica()) return 'Vencido'
   return 'Activo'
 }
 
@@ -155,12 +159,30 @@ export async function saveCredit(input: unknown): Promise<{ ok: true } | { ok: f
     }
 
     const payload = parsed.data
-    const paid = Math.min(payload.paid, payload.amount)
-    const balance = Math.max(payload.amount - paid, 0)
     const supabase = createAdminClient()
 
+    let currentCredit: { amount: number | string; balance: number | string; expires_at: string | null } | null = null
     if (payload.id) {
-      const { error } = await supabase
+      const { data, error } = await supabase.from('credits').select('amount, balance, expires_at').eq('id', payload.id).single()
+      if (error) return { ok: false, message: error.message }
+      currentCredit = data
+    }
+    if (payload.dueDate && payload.dueDate < todayInCostaRica() && payload.dueDate !== dateInputValue(currentCredit?.expires_at)) {
+      return { ok: false, message: 'La fecha de vencimiento no puede ser anterior a hoy.' }
+    }
+
+    const amount = Math.round(payload.amount * 100)
+    const previousPaid = currentCredit
+      ? Math.max(0, Math.round(Number(currentCredit.amount) * 100) - Math.round(Number(currentCredit.balance) * 100))
+      : 0
+    const newPayment = Math.round(payload.paid * 100)
+    if (previousPaid > amount || newPayment > amount - previousPaid) {
+      return { ok: false, message: 'El abono no puede superar el saldo pendiente del crédito.' }
+    }
+    const balance = (amount - previousPaid - newPayment) / 100
+
+    if (payload.id && currentCredit) {
+      const { data, error } = await supabase
         .from('credits')
         .update({
           user_id: payload.customerId,
@@ -171,8 +193,13 @@ export async function saveCredit(input: unknown): Promise<{ ok: true } | { ok: f
           expires_at: payload.dueDate ? `${payload.dueDate}T23:59:59.999Z` : null,
         })
         .eq('id', payload.id)
+        .eq('amount', currentCredit.amount)
+        .eq('balance', currentCredit.balance)
+        .select('id')
+        .maybeSingle()
 
       if (error) return { ok: false, message: error.message }
+      if (!data) return { ok: false, message: 'El crédito cambió en otra sesión. Actualizá el listado e intentá de nuevo.' }
       return { ok: true }
     }
 

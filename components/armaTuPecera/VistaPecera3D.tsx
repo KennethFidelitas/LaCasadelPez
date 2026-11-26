@@ -4,12 +4,12 @@ import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Edges, OrbitControls, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
-import { FILTROS, ILUMINACIONES, PECERAS, PECERAS_PREDISENO, PECES } from './data'
-import type { WaterType } from './types'
+import { FILTROS, ILUMINACIONES, PECERAS_PREDISENO, PECES } from './data'
+import type { Pecera, WaterType } from './types'
 
 interface Props {
   waterType: WaterType | null
-  peceraId: string | null
+  pecera: Pecera | null
   filtroId: string | null
   iluminacionId: string | null
   accesoriosSeleccionados: Record<string, boolean>
@@ -28,19 +28,15 @@ interface FishInstance {
 
 export function VistaPecera3D({
   waterType,
-  peceraId,
+  pecera,
   filtroId,
   iluminacionId,
   accesoriosSeleccionados,
   fishQuantities,
 }: Props) {
-  const pecera = useMemo(
-    () => [...PECERAS, ...PECERAS_PREDISENO].find(item => item.id === peceraId) ?? null,
-    [peceraId],
-  )
   const filtro = FILTROS.find(item => item.id === filtroId) ?? null
   const iluminacion = ILUMINACIONES.find(item => item.id === iluminacionId) ?? null
-  const prediseno = PECERAS_PREDISENO.find(item => item.id === peceraId) ?? null
+  const prediseno = PECERAS_PREDISENO.find(item => item.id === pecera?.id) ?? null
 
   const dimensiones = useMemo(() => parseDimensions(pecera?.dimensions), [pecera?.dimensions])
   const fish = useMemo(() => createFishInstances(fishQuantities), [fishQuantities])

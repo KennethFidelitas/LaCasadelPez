@@ -65,7 +65,7 @@ export function AuthForm() {
     if (mode === 'register' && password.length < 6) {
       setMessage({
         type: 'error',
-        title: 'Contrasena muy corta',
+        title: 'Contraseña muy corta',
         description: 'Usa al menos 6 caracteres para crear la cuenta.',
       })
       setIsLoading(false)
@@ -83,7 +83,9 @@ export function AuthForm() {
           setMessage({
             type: 'error',
             title: 'No se pudo iniciar sesión',
-            description: error.message,
+            description: error.status === 429
+              ? 'Demasiados intentos. Esperá unos minutos antes de volver a iniciar sesión.'
+              : error.message,
           })
           return
         }
@@ -93,7 +95,7 @@ export function AuthForm() {
         return
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -104,11 +106,13 @@ export function AuthForm() {
         },
       })
 
-      if (error) {
+      const duplicate = error?.code === 'user_already_exists' || error?.code === 'email_exists' ||
+        (data.user && data.user.identities?.length === 0)
+      if (error || duplicate) {
         setMessage({
           type: 'error',
           title: 'No se pudo crear la cuenta',
-          description: error.message,
+          description: duplicate ? 'Ya existe una cuenta con ese correo electrónico.' : error?.message ?? '',
         })
         return
       }

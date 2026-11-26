@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTemporaryPasswordEmail } from '@/lib/email/sender'
+import { phoneSchema } from '@/lib/phone-validation'
 import type { CustomerContactRecord } from '@/lib/customers/types'
 
 // Genera una contraseña temporal aleatoria y segura (12 caracteres,
@@ -37,7 +38,7 @@ const customerContactSchema = z
     firstName: z.string().trim().min(1, 'El nombre es obligatorio.'),
     lastName: z.string().trim().optional().default(''),
     email: z.string().trim().email('Ingresa un correo válido.').optional().or(z.literal('')),
-    phone: z.string().trim().optional().default(''),
+    phone: phoneSchema.optional().default(''),
     notes: z.string().trim().optional().default(''),
   })
   .superRefine((value, ctx) => {
@@ -52,7 +53,7 @@ const customerContactSchema = z
 
 // ── Resultado unificado, en la misma línea que lib/customers/create-access.ts ──
 export type CreateCustomerContactResult =
-  | { ok: true; customer: CustomerContactRecord; accountCreated: boolean; message: string }
+  | { ok: true; customer: CustomerContactRecord; accountCreated: boolean; emailFailed: boolean; message: string }
   | {
       ok: false
       code: 'VALIDATION_ERROR' | 'PERMISSION_ERROR' | 'DUPLICATE_AUTH_USER' | 'SERVER_ERROR'
@@ -110,36 +111,11 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
     }
   }
 
-  let accountCreated = false
+  let account: { id: string; email: string; password: string } | undefined
 
   if (payload.email) {
-    const customerEmail = payload.email.trim()
+    const customerEmail = payload.email.toLowerCase()
     const adminSupabase = createAdminClient()
-
-    // ── Verificar usuario duplicado ─────────────────────────────────────────
-    // Buscamos primero si ya existe un usuario de Auth con ese correo. Si existe,
-    // avisamos al admin en vez de resetear su contraseña o crear un duplicado.
-    const { data: existingUsers, error: listError } = await adminSupabase.auth.admin.listUsers()
-
-    if (listError) {
-      return {
-        ok: false,
-        code: 'SERVER_ERROR',
-        message: listError.message || 'No se pudo verificar la cuenta de autenticación del cliente.',
-      }
-    }
-
-    const existingAuthUser = existingUsers.users.find(
-      (candidate) => candidate.email?.toLowerCase() === customerEmail.toLowerCase(),
-    )
-
-    if (existingAuthUser) {
-      return {
-        ok: false,
-        code: 'DUPLICATE_AUTH_USER',
-        message: `Ya existe un usuario registrado con el correo ${customerEmail}. Usa la sección de clientes para ubicarlo en vez de crear uno nuevo.`,
-      }
-    }
 
     // ── Crear la cuenta de Auth + enviar la contraseña temporal ────────────
     const temporaryPassword = createTemporaryPassword()
@@ -152,11 +128,17 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
         first_name: payload.firstName,
         last_name: payload.lastName || '',
         phone: payload.phone || '',
-        role: 'customer',
       },
     })
 
     if (createUserError || !createdUser.user?.id) {
+      if (createUserError?.code === 'email_exists' || createUserError?.code === 'user_already_exists') {
+        return {
+          ok: false,
+          code: 'DUPLICATE_AUTH_USER',
+          message: `Ya existe un usuario registrado con el correo ${customerEmail}.`,
+        }
+      }
       return {
         ok: false,
         code: 'SERVER_ERROR',
@@ -166,7 +148,7 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
 
     const authUserId = createdUser.user.id
 
-    await adminSupabase.from('profiles').upsert(
+    const { error: profileWriteError } = await adminSupabase.from('profiles').upsert(
       {
         id: authUserId,
         email: customerEmail,
@@ -178,17 +160,13 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
       { onConflict: 'id' },
     )
 
-    const emailResult = await sendTemporaryPasswordEmail({
-      to: customerEmail,
-      firstName: payload.firstName,
-      temporaryPassword,
-    })
-
-    if (!emailResult.ok) {
-      console.error('[createCustomerContact] Temporary password email failed:', emailResult.error)
+    if (profileWriteError) {
+      const { error: cleanupError } = await adminSupabase.auth.admin.deleteUser(authUserId)
+      if (cleanupError) console.error('[createCustomerContact] Account cleanup failed:', cleanupError)
+      return { ok: false, code: 'SERVER_ERROR', message: profileWriteError.message }
     }
 
-    accountCreated = true
+    account = { id: authUserId, email: customerEmail, password: temporaryPassword }
   }
 
   // ── Registrar el contacto ────────────────────────────────────────────────
@@ -197,7 +175,7 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
     .insert({
       first_name: payload.firstName,
       last_name: payload.lastName || null,
-      email: payload.email || null,
+      email: account?.email ?? null,
       phone: payload.phone || null,
       notes: payload.notes || null,
       created_by: user.id,
@@ -206,6 +184,10 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
     .single()
 
   if (error) {
+    if (account) {
+      const { error: cleanupError } = await createAdminClient().auth.admin.deleteUser(account.id)
+      if (cleanupError) console.error('[createCustomerContact] Account cleanup failed:', cleanupError)
+    }
     return { ok: false, code: 'SERVER_ERROR', message: error.message }
   }
 
@@ -220,12 +202,28 @@ export async function createCustomerContact(input: unknown): Promise<CreateCusto
     createdAt: data.created_at,
   }
 
+  let emailFailed = false
+  let message = `Cliente ${customer.fullName} registrado correctamente.`
+  if (account) {
+    const emailResult = await sendTemporaryPasswordEmail({
+      to: account.email,
+      firstName: customer.firstName,
+      temporaryPassword: account.password,
+    })
+    emailFailed = !emailResult.ok
+    if (!emailResult.ok) {
+      console.error('[createCustomerContact] Temporary password email failed:', emailResult.error)
+      message = `Cliente ${customer.fullName} registrado. No se pudo enviar el correo de acceso. Puede usar la opción de recuperar contraseña.`
+    } else {
+      message = `Cliente ${customer.fullName} registrado. Se envió su contraseña temporal por correo.`
+    }
+  }
+
   return {
     ok: true,
     customer,
-    accountCreated,
-    message: accountCreated
-      ? `Cliente ${customer.fullName} registrado y se le envió su contraseña temporal por correo.`
-      : `Cliente ${customer.fullName} registrado correctamente.`,
+    accountCreated: Boolean(account),
+    emailFailed,
+    message,
   }
 }

@@ -29,7 +29,7 @@ export default async function StoreLayout({
       .eq('id', user.id)
       .maybeSingle<LayoutProfile>()
 
-    showAdminLink = profile?.role === 'admin'
+    showAdminLink = profile?.role === 'admin' || profile?.role === 'employee'
   }
 
   const settings = await getStoreSettings()

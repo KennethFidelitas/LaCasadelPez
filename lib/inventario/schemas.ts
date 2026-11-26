@@ -117,16 +117,18 @@ export type SalidaProductoValues = z.infer<typeof salidaProductoSchema>
 // Independiente de cualquier schema de animal — no comparte forma con
 // registroEntradaSchema ni con el alta de animal (agregar-animal/page.tsx).
 
-export const productoSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido').max(200),
-  brand: z.string().max(200).optional(),
-  description: z.string().min(1, 'La descripción es requerida'),
+const datosProductoSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre es requerido').max(200),
+  brand: z.string().trim().max(200).optional(),
+  description: z.string().trim().min(1, 'La descripción es requerida'),
   category_id: z.string().uuid('Selecciona una categoría válida'),
   price: z.coerce
     .number({ invalid_type_error: 'Ingrese un precio válido' })
+    .finite('Ingrese un precio válido')
     .min(0, 'El precio no puede ser negativo'),
   cost: z.coerce
     .number({ invalid_type_error: 'Ingrese un costo válido' })
+    .finite('Ingrese un costo válido')
     .min(0, 'El costo no puede ser negativo'),
   is_featured: z.boolean(),
   quantity: z.coerce
@@ -140,6 +142,11 @@ export const productoSchema = z.object({
     .min(0, 'No puede ser negativo')
     .optional(),
   supplier: z.string().max(200).optional(),
+})
+
+export const productoSchema = datosProductoSchema.extend({
+  name: datosProductoSchema.shape.name.regex(/\p{L}/u, 'El nombre debe incluir al menos una letra'),
+  price: datosProductoSchema.shape.price.positive('El precio de venta debe ser mayor a 0'),
 })
 
 export type ProductoValues = z.infer<typeof productoSchema>
@@ -157,6 +164,6 @@ export type ProductoValues = z.infer<typeof productoSchema>
 // desde este formulario, solo desde el modal de Stock (Entrada/Salida), para
 // no perder el rastro de auditoría en inventory_entries.
 
-export const editarProductoSchema = productoSchema.omit({ quantity: true })
+export const editarProductoSchema = datosProductoSchema.omit({ quantity: true })
 
 export type EditarProductoValues = z.infer<typeof editarProductoSchema>

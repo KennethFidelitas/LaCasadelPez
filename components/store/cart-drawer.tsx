@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/actions/button'
 import { Input } from '@/components/ui/forms/input'
 import { Textarea } from '@/components/ui/forms/textarea'
 import { useCart } from '@/lib/cart-context'
+import { PAYMENT_PROOF_EXTENSIONS, PAYMENT_PROOF_MAX_MB } from '@/lib/orders/payment-proof'
 import { formatPrice } from '@/lib/format'
 
 type Step = 'cart' | 'payment' | 'success'
@@ -72,12 +73,12 @@ export function CartDrawer() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!PAYMENT_PROOF_EXTENSIONS[file.type] || file.size === 0) {
       setError('El comprobante debe ser una imagen (JPG, PNG, WEBP).')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('La imagen no puede superar los 5 MB.')
+    if (file.size > PAYMENT_PROOF_MAX_MB * 1024 * 1024) {
+      setError(`La imagen no puede superar los ${PAYMENT_PROOF_MAX_MB} MB.`)
       return
     }
     setError(null)
@@ -103,9 +104,11 @@ export function CartDrawer() {
       if (customerNotes.trim()) fd.append('customer_notes', customerNotes.trim())
 
       const res = await fetch('/api/orders', { method: 'POST', body: fd })
-      const data = await res.json()
-
-      if (!res.ok) { setError(data.error ?? 'No se pudo procesar el pago.'); return }
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? 'No se pudo procesar el pago. Intentá de nuevo.')
+        return
+      }
 
       setOrderNumber(data.order_number)
       setConfirmationEmailSent(Boolean(data.email_sent))
@@ -393,14 +396,14 @@ export function CartDrawer() {
                   >
                     <ImagePlus className="h-8 w-8" />
                     <span className="text-sm font-medium">Tocá para subir la imagen</span>
-                    <span className="text-xs">JPG, PNG o WEBP · Máx. 5 MB</span>
+                    <span className="text-xs">JPG, PNG o WEBP · Máx. {PAYMENT_PROOF_MAX_MB} MB</span>
                   </button>
                 )}
 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   capture="environment"
                   className="hidden"
                   onChange={handleFileChange}

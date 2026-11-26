@@ -82,4 +82,6 @@ export interface ArmaTuPeceraStateExtended extends ArmaTuPeceraState {
   mode: AquariumMode | null
   selectedIluminacionId: string | null
   accesoriosSeleccionados: Record<string, boolean>  // id -> seleccionado
+  customDimensions?: CustomPeceraDimensions
+  customGlassType?: CustomGlassType
 }
